@@ -8,6 +8,22 @@ from app.models import Result
 from app.models.Search import Search
 from app.utils.sherlock_parser import parse_sherlock_file
 
+SITES = [
+    "Twitter", "Instagram", "Facebook", "TikTok", "Snapchat",
+    "Pinterest", "Tumblr", "Reddit", "YouTube", "WhatsApp",
+    "GitHub", "GitLab", "HackerNews", "DevTo", "StackOverflow",
+    "CodePen", "BitBucket",
+    "Behance", "Dribbble", "DeviantArt", "Flickr", "500px",
+    "Unsplash", "SoundCloud",
+    "Steam", "Twitch", "Roblox", "XboxLive", "PlayStationNetwork",
+    "LinkedIn", "AngelList", "Keybase",
+    "Spotify", "Bandcamp", "LastFM",
+    "Ethereum", "BitcoinForum",
+    "Medium", "WordPress", "Substack", "Quora", "Gravatar", "About.me",
+    "Etsy", "Patreon", "Kickstarter", "Fiverr", "Upwork",
+    "ProductHunt", "Archive.org",
+]
+
 
 async def run_sherlock(username: str, db: AsyncSession):
     try:
@@ -22,7 +38,9 @@ async def run_sherlock(username: str, db: AsyncSession):
             username,
             "--print-found",
             "--no-color",
-            "--threads", "20",
+            "--no-txt",
+            "--timeout", "10",
+            *[arg for site in SITES for arg in ("--site", site)],
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
