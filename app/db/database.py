@@ -1,21 +1,32 @@
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import declarative_base, sessionmaker
-from dotenv import load_dotenv
 import os
+
+from dotenv import load_dotenv
+from sqlalchemy.ext.asyncio import (
+    async_sessionmaker,
+    create_async_engine,
+)
+from sqlalchemy.orm import DeclarativeBase
 
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-engine = create_async_engine(DATABASE_URL, echo=True)
-
-AsyncSessionLocal = sessionmaker(
-    bind=engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
+if DATABASE_URL is None:
+    raise RuntimeError("Database URL is not set")
+engine = create_async_engine(
+    DATABASE_URL,
+    echo=True,
 )
 
-Base = declarative_base()
+
+class Base(DeclarativeBase):
+    pass
+
+
+AsyncSessionLocal = async_sessionmaker(
+    engine,
+    expire_on_commit=False,
+)
 
 
 async def get_db():

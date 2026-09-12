@@ -1,13 +1,29 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers.sherlock import router as sherlock_router
+from app.db.database import Base, engine
+from app.routers import sherlock
 
-app = FastAPI(title="openrecon-api")
 
-app.add_middleware(CORSMiddleware)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
 
-app.include_router(sherlock_router, prefix="/api/sherlock")
+
+app = FastAPI(title="OpenRecon API", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(sherlock.router, prefix="/api/sherlock", tags=["Sherlock"])
 
 
 @app.get("/")
