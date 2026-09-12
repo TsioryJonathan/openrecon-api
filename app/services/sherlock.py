@@ -30,7 +30,7 @@ async def run_sherlock(username: str, db: AsyncSession):
             raise Exception(f"Sherlock error: {stderr.decode()}")
         parsed = parse_sherlock_file(stdout.decode())
         for r in parsed:
-            result = Result(search_id=search.id, site=r["domain"], url=r["url"])
+            result = Result(search_id=search.id, site=r["site"], url=r["url"])
             db.add(result)
         await db.commit()
         return parsed

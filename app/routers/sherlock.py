@@ -27,7 +27,7 @@ async def get_results(username: str, db: AsyncSession = Depends(get_db)):
             {
                 "id": s.id,
                 "created_at": s.created_at,
-                "results": [{"domain": r.site, "url": r.url} for r in s.results],
+                "results": [{"site": r.site, "url": r.url} for r in s.results],
             }
             for s in result
         ],
