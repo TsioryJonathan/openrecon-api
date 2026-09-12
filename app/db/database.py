@@ -15,7 +15,10 @@ if DATABASE_URL is None:
     raise RuntimeError("Database URL is not set")
 engine = create_async_engine(
     DATABASE_URL,
-    echo=True,
+    echo=False,
+    pool_size=2,
+    max_overflow=1,
+    pool_pre_ping=True,
 )
 
 

@@ -22,6 +22,7 @@ async def run_sherlock(username: str, db: AsyncSession):
             username,
             "--print-found",
             "--no-color",
+            "--threads", "20",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
