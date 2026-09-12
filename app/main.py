@@ -6,10 +6,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.db.database import Base, engine
 from app.routers import sherlock
 
+from app import models
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
+        print(Base.metadata.tables.keys())
         await conn.run_sync(Base.metadata.create_all)
     yield
 
