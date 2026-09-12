@@ -1,7 +1,11 @@
 import asyncio
 
 
+from app.utils.sherlock_parser import parse_sherlock_file
+
+
 async def run_sherlock(username: str):
+
     process = await asyncio.create_subprocess_exec(
         "sherlock",
         username,
@@ -16,4 +20,4 @@ async def run_sherlock(username: str):
     if process.returncode != 0:
         raise Exception(f"Sherlock error: {stderr.decode()}")
 
-    return stdout.decode()
+    return parse_sherlock_file(stdout.decode())
