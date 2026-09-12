@@ -1,6 +1,8 @@
 import asyncio
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.strategy_options import selectinload
+from sqlalchemy.sql.expression import select
 
 from app.models import Result
 from app.models.Search import Search
@@ -28,10 +30,22 @@ async def run_sherlock(username: str, db: AsyncSession):
             raise Exception(f"Sherlock error: {stderr.decode()}")
         parsed = parse_sherlock_file(stdout.decode())
         for r in parsed:
-            result = Result(search_id=search.id, site=r["domain"], url=r["url"])
+            result = Result(search_id=search.id, site=r["site"], url=r["url"])
             db.add(result)
         await db.commit()
         return parsed
     except Exception:
         await db.rollback()
         raise
+
+
+async def get_results_by_username(username: str, db: AsyncSession):
+    stmt = (
+        select(Search)
+        .where(Search.username == username)
+        .options(selectinload(Search.results))
+    )
+    result = await db.execute(stmt)
+    if result is None:
+        return {"message": "Search does not exist yet"}
+    return result.scalars().all()

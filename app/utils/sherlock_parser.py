@@ -11,10 +11,10 @@ def parse_sherlock_file(raw_output: str) -> list[dict]:
             continue
 
         splitted = line.split(": ", 1)
-        domain = splitted[0].split(" ", 1)[1]
+        site = splitted[0].split(" ", 1)[1]
         results.append(
             {
-                "domain": domain,
+                "site": site,
                 "url": splitted[1],
             }
         )
