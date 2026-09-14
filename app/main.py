@@ -8,7 +8,7 @@ from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from fastapi.responses import PlainTextResponse
 
 from app.db.database import Base, engine
-from app.routers import sherlock
+from app.routers import sherlock, dork, exif, recon
 from app.schemas import MessageResponse
 
 from app import models
@@ -42,6 +42,9 @@ app.add_middleware(
 )
 
 app.include_router(sherlock.router, prefix="/api/sherlock", tags=["Sherlock"])
+app.include_router(dork.router, prefix="/api/dork", tags=["Dork"])
+app.include_router(exif.router, prefix="/api/exif", tags=["EXIF"])
+app.include_router(recon.router, prefix="/api/recon", tags=["Recon"])
 
 
 @app.get("/", response_model=MessageResponse, summary="Health check")
