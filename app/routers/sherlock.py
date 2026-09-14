@@ -3,11 +3,30 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import SHERLOCK_SITES
+from app.categories import SHERLOCK_CATEGORIES
 from app.db.database import get_db
-from app.schemas import ErrorResponse, GetResultsResponse, MessageResponse, SearchResponse
+from app.schemas import ErrorResponse, GetResultsResponse, MessageResponse, SearchResponse, SitesResponse
 from app.services.sherlock import get_results_by_username, run_sherlock
 
 router = APIRouter()
+
+
+@router.get(
+    "/sites",
+    response_model=SitesResponse,
+    summary="List all supported sites",
+    description=(
+        "Returns the full list of platforms supported by sherlock, "
+        "grouped by category. Use these names in the search endpoint."
+    ),
+)
+async def get_sites():
+    categories = [
+        {"name": name, "sites": sites}
+        for name, sites in SHERLOCK_CATEGORIES.items()
+    ]
+    total = sum(len(c["sites"]) for c in categories)
+    return {"categories": categories, "total": total}
 
 
 class SearchRequest(BaseModel):

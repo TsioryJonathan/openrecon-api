@@ -28,3 +28,13 @@ class MessageResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     detail: str
+
+
+class CategorySites(BaseModel):
+    name: str = Field(..., description="Category name")
+    sites: list[str] = Field(..., description="List of site names in this category")
+
+
+class SitesResponse(BaseModel):
+    categories: list[CategorySites] = Field(..., description="Sites grouped by category")
+    total: int = Field(..., description="Total number of supported sites")
