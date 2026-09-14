@@ -5,6 +5,21 @@ info:
     Uses sherlock-project to scan 480+ platforms.
   version: 0.1.0
 paths:
+  /api/sherlock/sites:
+    get:
+      tags:
+      - Sherlock
+      summary: List all supported sites
+      description: Returns the full list of platforms supported by sherlock, grouped
+        by category. Use these names in the search endpoint.
+      operationId: get_sites_api_sherlock_sites_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SitesResponse'
   /api/sherlock/search:
     post:
       tags:
@@ -83,6 +98,23 @@ paths:
                 $ref: '#/components/schemas/MessageResponse'
 components:
   schemas:
+    CategorySites:
+      properties:
+        name:
+          type: string
+          title: Name
+          description: Category name
+        sites:
+          items:
+            type: string
+          type: array
+          title: Sites
+          description: List of site names in this category
+      type: object
+      required:
+      - name
+      - sites
+      title: CategorySites
     ErrorResponse:
       properties:
         detail:
@@ -206,6 +238,23 @@ components:
       - created_at
       - results
       title: SearchResultEntry
+    SitesResponse:
+      properties:
+        categories:
+          items:
+            $ref: '#/components/schemas/CategorySites'
+          type: array
+          title: Categories
+          description: Sites grouped by category
+        total:
+          type: integer
+          title: Total
+          description: Total number of supported sites
+      type: object
+      required:
+      - categories
+      - total
+      title: SitesResponse
     ValidationError:
       properties:
         loc:
