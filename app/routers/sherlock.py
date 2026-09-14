@@ -21,6 +21,8 @@ async def search_username(body: SearchRequest, db: AsyncSession = Depends(get_db
 @router.get("/results")
 async def get_results(username: str, db: AsyncSession = Depends(get_db)):
     result = await get_results_by_username(username=username, db=db)
+    if isinstance(result, dict):
+        return result
     return {
         "username": username,
         "searches": [
