@@ -27,10 +27,7 @@ router = APIRouter()
     ),
 )
 async def get_sites():
-    categories = [
-        {"name": name, "sites": sites}
-        for name, sites in SHERLOCK_CATEGORIES.items()
-    ]
+    categories = [{"name": name, "sites": sites} for name, sites in SHERLOCK_CATEGORIES.items()]
     total = sum(len(c["sites"]) for c in categories)
     return {"categories": categories, "total": total}
 

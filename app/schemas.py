@@ -42,6 +42,7 @@ class SitesResponse(BaseModel):
 
 # --- Dork ---
 
+
 class DorkItem(BaseModel):
     title: str = Field(..., description="Human-readable name for this dork")
     query: str = Field(..., description="The Google dork query string")
@@ -72,13 +73,16 @@ class DorkGenerateResponse(BaseModel):
 
 # --- EXIF ---
 
+
 class ExifResponse(BaseModel):
     filename: str = Field(..., description="Original filename")
     has_gps: bool = Field(..., description="Whether GPS coordinates were found")
     gps: dict | None = Field(None, description="GPS data (lat, lon, altitude)")
     device: dict | None = Field(None, description="Device info (make, model)")
     lens: str | None = Field(None, description="Lens model")
-    camera_settings: dict | None = Field(None, description="Camera settings (focal length, aperture, ISO, etc.)")
+    camera_settings: dict | None = Field(
+        None, description="Camera settings (focal length, aperture, ISO, etc.)"
+    )
     image: dict | None = Field(None, description="Image info (dimensions, color space)")
     flash: str | None = Field(None, description="Flash info")
     white_balance: str | None = Field(None, description="White balance setting")
@@ -90,6 +94,7 @@ class ExifResponse(BaseModel):
 
 
 # --- Recon ---
+
 
 class ReconResponse(BaseModel):
     query: str = Field(..., description="Original query")

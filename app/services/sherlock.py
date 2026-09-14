@@ -20,8 +20,10 @@ async def run_sherlock(username: str, sites: list[str], db: AsyncSession):
         process = await asyncio.create_subprocess_exec(
             "sherlock-rs",
             username,
-            "--timeout", "10",
-            "--concurrency", "20",
+            "--timeout",
+            "10",
+            "--concurrency",
+            "20",
             *[arg for site in sites for arg in ("--site", site)],
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -55,11 +57,7 @@ async def get_results_by_username(
     username: str,
     db: AsyncSession,
 ):
-    stmt = (
-        select(Search)
-        .where(Search.username == username)
-        .options(selectinload(Search.results))
-    )
+    stmt = select(Search).where(Search.username == username).options(selectinload(Search.results))
 
     result = await db.execute(stmt)
     searches = result.scalars().all()

@@ -14,9 +14,7 @@ def is_ip(query: str) -> bool:
 
 
 def _is_valid_domain(query: str) -> bool:
-    domain_re = re.compile(
-        r"^(?!-)[a-z0-9-]{1,63}(?<!-)(\.[a-z0-9-]{1,63})+(?<!-)$"
-    )
+    domain_re = re.compile(r"^(?!-)[a-z0-9-]{1,63}(?<!-)(\.[a-z0-9-]{1,63})+(?<!-)$")
     return bool(domain_re.match(query))
 
 
@@ -58,9 +56,7 @@ async def _rdap(domain: str) -> dict:
         data = resp.json()
 
     events = {e["eventAction"]: e["eventDate"] for e in data.get("events", [])}
-    nameservers = [
-        ns.get("ldhName", "") for ns in data.get("nameservers", [])
-    ]
+    nameservers = [ns.get("ldhName", "") for ns in data.get("nameservers", [])]
 
     registrar = None
     for entity in data.get("entities", []):
@@ -84,14 +80,12 @@ async def _rdap(domain: str) -> dict:
 
 async def _crt_sh(domain: str) -> list[str]:
     async with httpx.AsyncClient(timeout=15) as client:
-        resp = await client.get(
-            f"https://crt.sh/?q=%25.{domain}&output=json"
-        )
+        resp = await client.get(f"https://crt.sh/?q=%25.{domain}&output=json")
         if resp.status_code != 200:
             return []
         try:
             entries = resp.json()
-        except (ValueError, KeyError):
+        except ValueError, KeyError:
             return []
 
     names = set()
@@ -105,16 +99,11 @@ async def _crt_sh(domain: str) -> list[str]:
 
 async def _dns(domain: str, rtype: str) -> list[str]:
     async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.get(
-            f"https://dns.google/resolve?name={domain}&type={rtype}"
-        )
+        resp = await client.get(f"https://dns.google/resolve?name={domain}&type={rtype}")
         if resp.status_code != 200:
             return []
         data = resp.json()
-        return [
-            a.get("data") or a.get("name", "")
-            for a in data.get("Answer", [])
-        ]
+        return [a.get("data") or a.get("name", "") for a in data.get("Answer", [])]
 
 
 async def recon_domain(domain: str) -> dict:

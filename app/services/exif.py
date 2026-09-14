@@ -36,7 +36,7 @@ async def run_exif_extract(filepath: str) -> dict:
 
     try:
         data = json.loads(stdout.decode())[0]
-    except (IndexError, json.JSONDecodeError):
+    except IndexError, json.JSONDecodeError:
         return {}
 
     return {
@@ -63,7 +63,9 @@ async def run_exif_extract(filepath: str) -> dict:
             "bits_per_sample": data.get("BitsPerSample"),
         },
         "flash": str(data.get("Flash", "")) if data.get("Flash") is not None else None,
-        "white_balance": str(data.get("WhiteBalance", "")) if data.get("WhiteBalance") is not None else None,
+        "white_balance": str(data.get("WhiteBalance", ""))
+        if data.get("WhiteBalance") is not None
+        else None,
         "scene_type": str(data.get("SceneType", "")) if data.get("SceneType") is not None else None,
         "datetime": data.get("DateTimeOriginal") or data.get("CreateDate"),
         "software": data.get("Software"),
