@@ -11,7 +11,7 @@ from app.schemas import MessageResponse
 
 from app import models
 
-OPENAPI_PATH = Path(__file__).parent.parent / "openapi.json"
+OPENAPI_PATH = Path(__file__).parent.parent / "openapi.yaml"
 
 
 @asynccontextmanager
@@ -47,7 +47,7 @@ def root():
     return {"message": "OpenRecon API is running"}
 
 
-@app.get("/openapi.json", include_in_schema=False)
+@app.get("/openapi.yaml", include_in_schema=False)
 def get_openapi_spec():
-    import json
-    return json.loads(OPENAPI_PATH.read_text())
+    import yaml
+    return yaml.safe_load(OPENAPI_PATH.read_text())
