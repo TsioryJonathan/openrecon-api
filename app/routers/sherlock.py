@@ -33,10 +33,9 @@ class SearchRequest(BaseModel):
     username: str = Field(..., description="Username to search for", examples=["john_doe"])
     sites: list[str] = Field(
         ...,
-        description="List of platforms to scan (max 50). "
+        description="List of platforms to scan. "
         "Use exact sherlock site names (e.g. GitHub, Twitter, Instagram).",
         examples=[["GitHub", "Twitter", "Instagram"]],
-        max_length=50,
     )
 
 
@@ -50,13 +49,10 @@ class SearchRequest(BaseModel):
         "Results are saved to the database for later retrieval."
     ),
     responses={
-        400: {"model": ErrorResponse, "description": "Invalid sites or limit exceeded"},
+        400: {"model": ErrorResponse, "description": "Unsupported sites"},
     },
 )
 async def search_username(body: SearchRequest, db: AsyncSession = Depends(get_db)):
-    if len(body.sites) > 50:
-        raise HTTPException(status_code=400, detail="Maximum 50 sites allowed")
-
     invalid = [s for s in body.sites if s not in SHERLOCK_SITES]
     if invalid:
         raise HTTPException(
