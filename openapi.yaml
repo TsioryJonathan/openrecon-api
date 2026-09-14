@@ -43,7 +43,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SearchResponse'
         '400':
-          description: Invalid sites or limit exceeded
+          description: Unsupported sites
           content:
             application/json:
               schema:
@@ -85,6 +85,114 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/dork/generate:
+    post:
+      tags:
+      - Dork
+      summary: Generate Google dorks for a target
+      description: Generates a list of Google dork queries for a given target (username,
+        email, domain, or real name). Each dork includes a copy-paste query and a
+        direct Google search URL.
+      operationId: generate_api_dork_generate_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DorkGenerateRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DorkGenerateResponse'
+        '400':
+          description: Empty target
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/exif/extract:
+    post:
+      tags:
+      - EXIF
+      summary: Extract EXIF metadata from an image
+      description: 'Uploads an image and returns its EXIF metadata: GPS coordinates,
+        device make/model, capture date, editing software, and copyright.'
+      operationId: extract_api_exif_extract_post
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Body_extract_api_exif_extract_post'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExifResponse'
+        '400':
+          description: Invalid file type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/recon:
+    get:
+      tags:
+      - Recon
+      summary: Recon an IP address or domain
+      description: Accepts an IPv4/IPv6 address or a domain name. For an IP, returns
+        geolocation, ISP, ASN, and proxy status. For a domain, returns registrar,
+        creation/expiry dates, nameservers, DNS records, and subdomains.
+      operationId: get_recon_api_recon_get
+      parameters:
+      - name: query
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Query
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReconResponse'
+        '400':
+          description: Invalid query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Upstream service error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /:
     get:
       summary: Health check
@@ -98,6 +206,16 @@ paths:
                 $ref: '#/components/schemas/MessageResponse'
 components:
   schemas:
+    Body_extract_api_exif_extract_post:
+      properties:
+        file:
+          type: string
+          contentMediaType: application/octet-stream
+          title: File
+      type: object
+      required:
+      - file
+      title: Body_extract_api_exif_extract_post
     CategorySites:
       properties:
         name:
@@ -115,6 +233,84 @@ components:
       - name
       - sites
       title: CategorySites
+    DorkCategory:
+      properties:
+        name:
+          type: string
+          title: Name
+          description: Category name
+        description:
+          type: string
+          title: Description
+          description: What this category covers
+        dorks:
+          items:
+            $ref: '#/components/schemas/DorkItem'
+          type: array
+          title: Dorks
+          description: List of dorks in this category
+      type: object
+      required:
+      - name
+      - description
+      - dorks
+      title: DorkCategory
+    DorkGenerateRequest:
+      properties:
+        target:
+          type: string
+          maxLength: 64
+          minLength: 1
+          title: Target
+          description: Target to generate dorks for (username, email, domain, or name)
+          examples:
+          - john_doe
+      type: object
+      required:
+      - target
+      title: DorkGenerateRequest
+    DorkGenerateResponse:
+      properties:
+        target:
+          type: string
+          title: Target
+          description: The target that was used
+        total:
+          type: integer
+          title: Total
+          description: Total number of dorks generated
+        categories:
+          items:
+            $ref: '#/components/schemas/DorkCategory'
+          type: array
+          title: Categories
+          description: Dorks grouped by category
+      type: object
+      required:
+      - target
+      - total
+      - categories
+      title: DorkGenerateResponse
+    DorkItem:
+      properties:
+        title:
+          type: string
+          title: Title
+          description: Human-readable name for this dork
+        query:
+          type: string
+          title: Query
+          description: The Google dork query string
+        url:
+          type: string
+          title: Url
+          description: Direct Google search URL
+      type: object
+      required:
+      - title
+      - query
+      - url
+      title: DorkItem
     ErrorResponse:
       properties:
         detail:
@@ -124,6 +320,59 @@ components:
       required:
       - detail
       title: ErrorResponse
+    ExifResponse:
+      properties:
+        filename:
+          type: string
+          title: Filename
+          description: Original filename
+        has_gps:
+          type: boolean
+          title: Has Gps
+          description: Whether GPS coordinates were found
+        gps:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Gps
+          description: GPS data (lat, lon, altitude)
+        device:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Device
+          description: Device info (make, model)
+        datetime:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Datetime
+          description: Original capture date/time
+        software:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Software
+          description: Software used to process the image
+        artist:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Artist
+          description: Artist/owner name
+        copyright:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Copyright
+          description: Copyright information
+      type: object
+      required:
+      - filename
+      - has_gps
+      title: ExifResponse
     GetResultsResponse:
       properties:
         username:
@@ -159,6 +408,27 @@ components:
       required:
       - message
       title: MessageResponse
+    ReconResponse:
+      properties:
+        query:
+          type: string
+          title: Query
+          description: Original query
+        type:
+          type: string
+          title: Type
+          description: 'Type of query: ''ip'' or ''domain'''
+        data:
+          additionalProperties: true
+          type: object
+          title: Data
+          description: Recon results
+      type: object
+      required:
+      - query
+      - type
+      - data
+      title: ReconResponse
     ResultItem:
       properties:
         site:
@@ -186,10 +456,9 @@ components:
           items:
             type: string
           type: array
-          maxItems: 50
           title: Sites
-          description: List of platforms to scan (max 50). Use exact sherlock site
-            names (e.g. GitHub, Twitter, Instagram).
+          description: List of platforms to scan. Use exact sherlock site names (e.g.
+            GitHub, Twitter, Instagram).
           examples:
           - - GitHub
             - Twitter
