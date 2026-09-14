@@ -17,7 +17,15 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="OpenRecon API", lifespan=lifespan)
+app = FastAPI(
+    title="OpenRecon API",
+    description="API de reconnaissance OSINT pour retrouver les traces d'un utilisateur sur le web. "
+    "Utilise sherlock-project pour scanner plus de 480 plateformes.",
+    version="0.1.0",
+    lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -29,6 +37,6 @@ app.add_middleware(
 app.include_router(sherlock.router, prefix="/api/sherlock", tags=["Sherlock"])
 
 
-@app.get("/")
+@app.get("/", summary="Health check")
 def root():
     return {"message": "OpenRecon API is running"}
