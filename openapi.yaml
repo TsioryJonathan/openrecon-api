@@ -344,6 +344,44 @@ components:
           - type: 'null'
           title: Device
           description: Device info (make, model)
+        lens:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Lens
+          description: Lens model
+        camera_settings:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Camera Settings
+          description: Camera settings (focal length, aperture, ISO, etc.)
+        image:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Image
+          description: Image info (dimensions, color space)
+        flash:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Flash
+          description: Flash info
+        white_balance:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: White Balance
+          description: White balance setting
+        scene_type:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Scene Type
+          description: Scene type
         datetime:
           anyOf:
           - type: string
