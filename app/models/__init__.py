@@ -1,4 +1,4 @@
-from app.models.Search import Search
 from app.models.Result import Result
+from app.models.Search import Search
 
-__all__ = ["Search", "Result"]
+__all__ = ["Result", "Search"]

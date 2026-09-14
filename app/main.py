@@ -4,14 +4,12 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
+from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import PlainTextResponse
 
 from app.db.database import Base, engine
-from app.routers import sherlock, dork, exif, recon
+from app.routers import dork, exif, recon, sherlock
 from app.schemas import MessageResponse
-
-from app import models
 
 OPENAPI_PATH = Path(__file__).parent.parent / "openapi.yaml"
 

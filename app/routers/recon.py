@@ -1,3 +1,4 @@
+import httpx
 from fastapi import APIRouter, HTTPException
 
 from app.schemas import ErrorResponse, ReconResponse
@@ -29,7 +30,7 @@ async def get_recon(query: str):
         query_type, data = await recon(query)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
+    except httpx.HTTPError as e:
         raise HTTPException(status_code=502, detail=f"Recon failed: {e}")
 
     return {"query": query, "type": query_type, "data": data}

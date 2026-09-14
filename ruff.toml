@@ -1,0 +1,13 @@
+target-version = "py314"
+line-length = 100
+
+[lint]
+ignore = [
+    "EXE002",  # shebang not needed for app modules
+    "N999",    # module names (Result, Search are fine)
+    "B008",    # Depends() in FastAPI default args is the standard pattern
+    "TRY002",  # custom exceptions not required
+]
+
+[lint.per-file-ignores]
+"app/__init__.py" = ["F401"]

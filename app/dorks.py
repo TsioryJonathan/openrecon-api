@@ -1,6 +1,5 @@
 from urllib.parse import quote
 
-
 DORK_TEMPLATES: list[tuple[str, str, list[tuple[str, str]]]] = [
     (
         "Social Media",

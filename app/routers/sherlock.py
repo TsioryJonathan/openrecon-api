@@ -2,10 +2,16 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.constants import SHERLOCK_SITES
 from app.categories import SHERLOCK_CATEGORIES
+from app.constants import SHERLOCK_SITES
 from app.db.database import get_db
-from app.schemas import ErrorResponse, GetResultsResponse, MessageResponse, SearchResponse, SitesResponse
+from app.schemas import (
+    ErrorResponse,
+    GetResultsResponse,
+    MessageResponse,
+    SearchResponse,
+    SitesResponse,
+)
 from app.services.sherlock import get_results_by_username, run_sherlock
 
 router = APIRouter()

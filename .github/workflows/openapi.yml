@@ -1,0 +1,40 @@
+name: Auto-generate OpenAPI
+
+on:
+  push:
+    branches: [dev]
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Generate openapi.yaml
+        run: uv run python scripts/generate_openapi.py
+        env:
+          DATABASE_URL: postgresql+asyncpg://fake:fake@localhost/fake
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet openapi.yaml; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push if changed
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add openapi.yaml
+          git commit -m "chore: auto-regenerate openapi.yaml"
+          git push

@@ -9,7 +9,6 @@ from app.models.Search import Search
 from app.utils.sherlock_parser import parse_sherlock_file
 
 
-
 async def run_sherlock(username: str, sites: list[str], db: AsyncSession):
     try:
         search = Search(username=username)
