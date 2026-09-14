@@ -11,11 +11,11 @@ router = APIRouter()
 
 
 class SearchRequest(BaseModel):
-    username: str = Field(..., description="Nom d'utilisateur à rechercher", examples=["john_doe"])
+    username: str = Field(..., description="Username to search for", examples=["john_doe"])
     sites: list[str] = Field(
         ...,
-        description="Liste des plateformes à scanner (max 50). "
-        "Utilise les noms exacts de sherlock (ex: GitHub, Twitter, Instagram).",
+        description="List of platforms to scan (max 50). "
+        "Use exact sherlock site names (e.g. GitHub, Twitter, Instagram).",
         examples=[["GitHub", "Twitter", "Instagram"]],
         max_length=50,
     )
@@ -24,14 +24,14 @@ class SearchRequest(BaseModel):
 @router.post(
     "/search",
     response_model=SearchResponse,
-    summary="Lancer une recherche OSINT",
+    summary="Launch an OSINT search",
     description=(
-        "Lance une recherche sherlock sur les plateformes spécifiées. "
-        "Le nom d'utilisateur est vérifié sur chaque site de la liste. "
-        "Les résultats sont sauvegardés en base pour consultation ultérieure."
+        "Runs a sherlock scan on the specified platforms. "
+        "The username is checked on each site in the list. "
+        "Results are saved to the database for later retrieval."
     ),
     responses={
-        400: {"model": ErrorResponse, "description": "Sites invalides ou dépassement de la limite"},
+        400: {"model": ErrorResponse, "description": "Invalid sites or limit exceeded"},
     },
 )
 async def search_username(body: SearchRequest, db: AsyncSession = Depends(get_db)):
@@ -52,10 +52,10 @@ async def search_username(body: SearchRequest, db: AsyncSession = Depends(get_db
 @router.get(
     "/results",
     response_model=GetResultsResponse | MessageResponse,
-    summary="Récupérer les résultats d'une recherche",
+    summary="Retrieve search results",
     description=(
-        "Retourne l'historique de toutes les recherches effectuées pour un nom d'utilisateur donné. "
-        "Chaque recherche contient la liste des résultats trouvés."
+        "Returns the history of all searches performed for a given username. "
+        "Each search includes the list of results found."
     ),
 )
 async def get_results(username: str, db: AsyncSession = Depends(get_db)):

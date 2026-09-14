@@ -20,8 +20,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="OpenRecon API",
-    description="API de reconnaissance OSINT pour retrouver les traces d'un utilisateur sur le web. "
-    "Utilise sherlock-project pour scanner plus de 480 plateformes.",
+    description="OSINT reconnaissance API to find a user's presence across the web. "
+    "Uses sherlock-project to scan 480+ platforms.",
     version="0.1.0",
     lifespan=lifespan,
     docs_url="/docs",
