@@ -19,11 +19,10 @@ async def run_sherlock(username: str, sites: list[str], db: AsyncSession):
         await db.refresh(search)
 
         process = await asyncio.create_subprocess_exec(
-            "sherlock",
+            "sherlock-rs",
             username,
-            "--print-found",
-            "--no-color",
             "--timeout", "10",
+            "--concurrency", "20",
             *[arg for site in sites for arg in ("--site", site)],
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
