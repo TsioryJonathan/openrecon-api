@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.db.database import Base, engine
 from app.routers import sherlock
+from app.schemas import MessageResponse
 
 from app import models
 
@@ -37,6 +38,6 @@ app.add_middleware(
 app.include_router(sherlock.router, prefix="/api/sherlock", tags=["Sherlock"])
 
 
-@app.get("/", summary="Health check")
+@app.get("/", response_model=MessageResponse, summary="Health check")
 def root():
     return {"message": "OpenRecon API is running"}
