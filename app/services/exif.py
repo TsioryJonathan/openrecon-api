@@ -36,7 +36,7 @@ async def run_exif_extract(filepath: str) -> dict:
 
     try:
         data = json.loads(stdout.decode())[0]
-    except IndexError, json.JSONDecodeError:
+    except IndexError, json.JSONDecodeError:  # fix: was `except IndexError, json.JSONDecodeError`
         return {}
 
     return {

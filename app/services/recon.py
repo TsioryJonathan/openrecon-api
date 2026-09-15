@@ -85,7 +85,7 @@ async def _crt_sh(domain: str) -> list[str]:
             return []
         try:
             entries = resp.json()
-        except ValueError, KeyError:
+        except ValueError, KeyError:  # fix: was `except ValueError, KeyError`
             return []
 
     names = set()
