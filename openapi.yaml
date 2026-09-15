@@ -193,6 +193,47 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/scan:
+    post:
+      tags:
+      - Scan
+      summary: Run an OpenRecon scan
+      description: 'Runs the OpenRecon pipeline for a given target. Creates or reuses
+        a Target, executes the appropriate module(s), stores all Findings and Evidence,
+        and returns a structured result.
+
+
+        Currently supported target types: `username` (uses Sherlock).
+
+
+        For username scans, pass a `sites` list to restrict the scan to specific platforms.
+        Omit `sites` to scan all supported platforms.'
+      operationId: scan_api_scan_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScanRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanResponse'
+        '400':
+          description: Unsupported target type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /:
     get:
       summary: Health check
@@ -482,6 +523,178 @@ components:
       - site
       - url
       title: ResultItem
+    ScanEvidenceItem:
+      properties:
+        id:
+          type: string
+          title: Id
+          description: Evidence ID
+        source:
+          type: string
+          title: Source
+          description: Module that produced this evidence
+        evidence_type:
+          type: string
+          title: Evidence Type
+          description: Kind of evidence (e.g. 'url')
+        value:
+          type: string
+          title: Value
+          description: Raw evidence value
+        observed_at:
+          type: string
+          title: Observed At
+          description: ISO timestamp
+      type: object
+      required:
+      - id
+      - source
+      - evidence_type
+      - value
+      - observed_at
+      title: ScanEvidenceItem
+    ScanFindingItem:
+      properties:
+        id:
+          type: string
+          title: Id
+          description: Finding ID
+        type:
+          type: string
+          title: Type
+          description: Finding type (e.g. 'social_account')
+        value:
+          type: string
+          title: Value
+          description: Finding value (e.g. a profile URL)
+        source:
+          type: string
+          title: Source
+          description: Module that produced this finding
+        confidence:
+          type: string
+          title: Confidence
+          description: CONFIRMED / LIKELY / POSSIBLE
+        confidence_reason:
+          type: string
+          title: Confidence Reason
+          description: Why this confidence was assigned
+        observed_at:
+          type: string
+          title: Observed At
+          description: ISO timestamp
+        evidence:
+          items:
+            $ref: '#/components/schemas/ScanEvidenceItem'
+          type: array
+          title: Evidence
+          description: Evidence backing this finding
+      type: object
+      required:
+      - id
+      - type
+      - value
+      - source
+      - confidence
+      - confidence_reason
+      - observed_at
+      title: ScanFindingItem
+    ScanRequest:
+      properties:
+        target_type:
+          type: string
+          title: Target Type
+          description: 'Type of the target. Currently supported: ''username''.'
+          examples:
+          - username
+        target_value:
+          type: string
+          maxLength: 128
+          minLength: 1
+          title: Target Value
+          description: The value to investigate (e.g. a username, domain, or IP).
+          examples:
+          - john123
+        sites:
+          items:
+            type: string
+          type: array
+          title: Sites
+          description: 'For username scans: restrict to these Sherlock site names.
+            Omit or pass an empty list to scan all supported sites.'
+          examples:
+          - - GitHub
+            - Reddit
+            - Twitter
+      type: object
+      required:
+      - target_type
+      - target_value
+      title: ScanRequest
+    ScanResponse:
+      properties:
+        target:
+          $ref: '#/components/schemas/ScanTargetItem'
+          description: The investigated target
+        finding_count:
+          type: integer
+          title: Finding Count
+          description: Total findings stored
+        evidence_count:
+          type: integer
+          title: Evidence Count
+          description: Total evidence stored
+        modules_run:
+          items:
+            type: string
+          type: array
+          title: Modules Run
+          description: Modules that were executed
+        findings:
+          items:
+            $ref: '#/components/schemas/ScanFindingItem'
+          type: array
+          title: Findings
+          description: All findings from this scan
+        errors:
+          items:
+            type: string
+          type: array
+          title: Errors
+          description: Errors encountered during the scan (partial results possible)
+      type: object
+      required:
+      - target
+      - finding_count
+      - evidence_count
+      - modules_run
+      - findings
+      title: ScanResponse
+    ScanTargetItem:
+      properties:
+        id:
+          type: string
+          title: Id
+          description: Target ID
+        type:
+          type: string
+          title: Type
+          description: Target type
+        value:
+          type: string
+          title: Value
+          description: Target value
+        created_at:
+          type: string
+          title: Created At
+          description: ISO timestamp
+      type: object
+      required:
+      - id
+      - type
+      - value
+      - created_at
+      title: ScanTargetItem
     SearchRequest:
       properties:
         username:
