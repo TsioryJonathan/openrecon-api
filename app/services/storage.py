@@ -5,16 +5,15 @@ Central persistence layer for the OpenRecon core data model.
 
 Responsibilities:
 - Create and retrieve Target, Finding, Evidence records.
-- Inject target_id into findings and finding_id into evidence
-  (the module layer never touches these foreign keys directly).
-- Provide a single function that persists a full ModuleResult in one
-  transaction: store_module_result().
+- Normalize finding values before storage (app.core.normalizer).
+- Deduplicate findings before insertion (app.core.deduplicator).
+- Attach evidence to existing findings when duplicates are detected.
+- Provide store_module_result() as the single entry point after a module run.
 
 Rules:
 - Never import from routers or schemas here.
 - Never call any module directly here.
-- All functions receive an AsyncSession from the caller (FastAPI dependency
-  injection or the future orchestrator). This keeps transactions explicit.
+- All functions receive an AsyncSession from the caller.
 """
 
 import logging
@@ -23,6 +22,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.deduplicator import deduplicate_findings, prepare_findings_for_storage
 from app.models.Evidence import Evidence
 from app.models.Finding import Finding
 from app.models.Target import Target
@@ -45,9 +45,8 @@ async def create_target(
     """
     Create and persist a new Target.
 
-    Does NOT check for duplicates — the caller decides whether to reuse an
-    existing target or create a fresh one. Use get_target_by_value() first
-    if deduplication is needed.
+    Does NOT check for duplicates — use get_or_create_target() when
+    deduplication is needed.
     """
     target = Target(type=type, value=value, meta=meta)
     db.add(target)
@@ -113,6 +112,7 @@ async def create_finding(
     target_id: str,
     type: str,
     value: str,
+    normalized_value: str,
     source: str,
     confidence: str,
     confidence_reason: str,
@@ -123,6 +123,7 @@ async def create_finding(
         target_id=target_id,
         type=type,
         value=value,
+        normalized_value=normalized_value,
         source=source,
         confidence=confidence,
         confidence_reason=confidence_reason,
@@ -195,26 +196,32 @@ async def store_module_result(
     evidence_data: list[dict],
 ) -> tuple[list[Finding], list[Evidence]]:
     """
-    Persist a full set of findings and their evidence in a single transaction.
+    Normalize, deduplicate, and persist findings + evidence in one transaction.
 
-    This is the primary entry point used after a module executes.
+    Pipeline:
+    1. Normalize: compute normalized_value for each finding dict.
+    2. Deduplicate: split into new findings vs already-existing ones.
+    3. Insert new findings (flush to get IDs).
+    4. Insert evidence for new findings.
+    5. Insert evidence for existing (duplicate) findings — evidence accumulates.
+    6. Commit.
 
-    The caller passes:
-    - target_id: the already-created Target this result belongs to.
-    - findings_data: list of dicts from ModuleResult.findings.
-      Each dict must have: type, value, source, confidence, confidence_reason.
-      Optional: metadata.
-    - evidence_data: list of dicts from ModuleResult.evidence.
-      Must be same length as findings_data and in the same order —
-      evidence_data[i] is the evidence for findings_data[i].
+    Args:
+        db: async SQLAlchemy session.
+        target_id: the already-created Target this result belongs to.
+        findings_data: list of dicts from ModuleResult.findings.
+            Required keys: type, value, source, confidence, confidence_reason.
+            Optional: metadata.
+        evidence_data: list of dicts from ModuleResult.evidence.
+            Must be same length as findings_data, same index order.
+            Required keys: source, evidence_type, value.
+            Optional: metadata.
 
-    Returns (stored_findings, stored_evidence).
+    Returns:
+        (all_findings, all_evidence) — includes both newly inserted records
+        and the existing Finding objects that received new evidence.
 
-    If the lengths differ, evidence is stored only for findings that have a
-    matching index. A warning is logged for mismatches.
-
-    All inserts happen in a single transaction. On failure, everything is
-    rolled back and the exception is re-raised.
+    On failure: rolls back and re-raises.
     """
     if len(findings_data) != len(evidence_data):
         logger.warning(
@@ -224,31 +231,61 @@ async def store_module_result(
             target_id,
         )
 
+    # Step 1 — Normalize.
+    prepare_findings_for_storage(findings_data)
+
+    # Step 2 — Deduplicate.
+    new_findings_data, new_evidence_data, existing_ids = await deduplicate_findings(
+        db,
+        target_id=target_id,
+        findings_data=findings_data,
+        evidence_data=evidence_data,
+    )
+
     stored_findings: list[Finding] = []
     stored_evidence: list[Evidence] = []
 
     try:
-        for i, f_data in enumerate(findings_data):
+        # Step 3 — Insert new findings.
+        new_finding_objs: list[Finding] = []
+        for f_data in new_findings_data:
             finding = Finding(
                 target_id=target_id,
                 type=f_data["type"],
                 value=f_data["value"],
+                normalized_value=f_data["normalized_value"],
                 source=f_data["source"],
                 confidence=f_data["confidence"],
                 confidence_reason=f_data["confidence_reason"],
                 meta=f_data.get("metadata"),
             )
             db.add(finding)
-            stored_findings.append(finding)
+            new_finding_objs.append(finding)
 
-        # Flush to get DB-generated IDs without committing yet.
+        # Flush to get IDs before inserting evidence.
         await db.flush()
 
-        for i, e_data in enumerate(evidence_data):
-            if i >= len(stored_findings):
+        # Step 4 — Insert evidence for new findings.
+        for i, e_data in enumerate(new_evidence_data):
+            if i >= len(new_finding_objs):
                 break
             ev = Evidence(
-                finding_id=stored_findings[i].id,
+                finding_id=new_finding_objs[i].id,
+                source=e_data["source"],
+                evidence_type=e_data["evidence_type"],
+                value=e_data["value"],
+                meta=e_data.get("metadata"),
+            )
+            db.add(ev)
+            stored_evidence.append(ev)
+
+        # Step 5 — Insert evidence for existing (deduplicated) findings.
+        for original_idx, existing_finding_id in existing_ids.items():
+            if original_idx >= len(evidence_data):
+                continue
+            e_data = evidence_data[original_idx]
+            ev = Evidence(
+                finding_id=existing_finding_id,
                 source=e_data["source"],
                 evidence_type=e_data["evidence_type"],
                 value=e_data["value"],
@@ -259,14 +296,28 @@ async def store_module_result(
 
         await db.commit()
 
-        for f in stored_findings:
+        # Refresh all new objects.
+        for f in new_finding_objs:
             await db.refresh(f)
         for e in stored_evidence:
             await db.refresh(e)
 
+        stored_findings.extend(new_finding_objs)
+
+        # Also fetch the existing findings that received new evidence,
+        # so the caller has the full picture.
+        for existing_finding_id in existing_ids.values():
+            stmt = select(Finding).where(Finding.id == existing_finding_id)
+            res = await db.execute(stmt)
+            existing_f = res.scalars().first()
+            if existing_f and existing_f not in stored_findings:
+                stored_findings.append(existing_f)
+
         logger.info(
-            "store_module_result: stored %d findings, %d evidence for target_id=%s",
-            len(stored_findings),
+            "store_module_result: %d new findings, %d deduplicated, "
+            "%d evidence stored for target_id=%s",
+            len(new_finding_objs),
+            len(existing_ids),
             len(stored_evidence),
             target_id,
         )
