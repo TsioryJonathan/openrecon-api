@@ -41,6 +41,11 @@ async def scan(body: ScanRequest, db: AsyncSession = Depends(get_db)):
         sites=body.sites,
     )
 
+    # Build evidence index by finding_id (avoids lazy loading).
+    evidence_by_finding: dict[str, list] = {}
+    for e in result.evidence:
+        evidence_by_finding.setdefault(e.finding_id, []).append(e)
+
     # Build findings list with their evidence.
     findings_out = []
     for f in result.findings:
@@ -52,7 +57,7 @@ async def scan(body: ScanRequest, db: AsyncSession = Depends(get_db)):
                 "value": e.value,
                 "observed_at": str(e.observed_at),
             }
-            for e in (f.evidence if f.evidence else [])
+            for e in evidence_by_finding.get(f.id, [])
         ]
         findings_out.append(
             {
