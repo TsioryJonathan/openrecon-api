@@ -5,21 +5,22 @@ Orchestrates the core OpenRecon pipeline for a single scan:
 
     Target
       ↓
-    Module (currently SherlockModule for username targets)
+    Module(s) registered for the target type
       ↓
     ModuleResult (Finding[] + Evidence[])
       ↓
+    Normalization + Deduplication
+      ↓
     Storage
 
-This is the first real end-to-end pipeline. It is intentionally simple:
-one target type, one module, one storage call. The orchestrator (Phase 7)
-will extend this with multi-module chaining and adaptive recon.
+For investigation-scoped scans, the target is also linked to the
+investigation after creation (run_scan_for_investigation).
 
 Rules:
 - Never import routers or Pydantic schemas here.
 - Never call the DB directly — delegate to app.services.storage.
 - Never call modules from routers — routers call this service.
-- Errors from the module are captured and returned, never swallowed silently.
+- Errors from modules are captured and returned, never swallowed.
 """
 
 import logging
@@ -30,15 +31,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.Evidence import Evidence
 from app.models.Finding import Finding
 from app.models.Target import Target
+from app.modules.dns import DNSModule
 from app.modules.sherlock import SherlockModule
+from app.services import investigation as inv_service
 from app.services.storage import get_or_create_target, store_module_result
 
 logger = logging.getLogger(__name__)
 
-# Module registry — maps target_type to the module that handles it.
-# When new modules are added (DNS, RDAP, HTTP...), register them here.
+# ---------------------------------------------------------------------------
+# Module registry
+# ---------------------------------------------------------------------------
 _MODULE_REGISTRY: dict[str, list] = {
     "username": [SherlockModule()],
+    "domain": [DNSModule()],
 }
 
 SUPPORTED_TARGET_TYPES = list(_MODULE_REGISTRY.keys())
@@ -54,7 +59,6 @@ class ScanResult:
     - findings: all Finding ORM objects stored in this scan.
     - evidence: all Evidence ORM objects stored in this scan.
     - errors: list of error strings from module execution.
-      A scan can be partially successful (some findings + some errors).
     - modules_run: names of modules that were executed.
     """
 
@@ -78,40 +82,36 @@ async def run_scan(
     *,
     target_type: str,
     target_value: str,
-    **kwargs,
+    options: dict | None = None,
 ) -> ScanResult:
     """
     Run a full scan pipeline for a given target.
 
     Steps:
     1. Validate target_type is supported.
-    2. Get or create the Target in the DB (deduplication by type+value).
-    3. For each module registered for this target_type:
-       a. Execute the module.
-       b. Collect errors.
-       c. If findings were produced, persist them via store_module_result.
-    4. Return a ScanResult with all stored findings, evidence, and any errors.
+    2. Get or create the Target (deduplication by type+value).
+    3. Execute each registered module, passing options as kwargs.
+    4. Persist findings + evidence (normalization + deduplication inside).
+    5. Return ScanResult. Never raises.
 
     Args:
         db: async SQLAlchemy session.
-        target_type: canonical type string (e.g. "username").
-        target_value: the value to investigate (e.g. "john123").
-        **kwargs: passed through to the module's execute() method.
-                  For SherlockModule: sites=list[str].
-
-    Returns:
-        ScanResult. Never raises — all errors are captured in ScanResult.errors.
+        target_type: canonical type string (e.g. "username", "domain").
+        target_value: the value to investigate.
+        options: optional dict passed as **kwargs to each module's execute().
+            SherlockModule: {"sites": ["GitHub", "Reddit"]}
+            DNSModule: no options currently used.
     """
+    options = options or {}
+
     if target_type not in _MODULE_REGISTRY:
         supported = ", ".join(SUPPORTED_TARGET_TYPES)
-        # We still need a Target object to return — create a minimal one.
         target, _ = await get_or_create_target(db, type=target_type, value=target_value)
         return ScanResult(
             target=target,
             errors=[(f"Unsupported target type '{target_type}'. Supported types: {supported}.")],
         )
 
-    # Step 1 — Get or create the Target.
     target, created = await get_or_create_target(db, type=target_type, value=target_value)
     logger.info(
         "run_scan: target id=%s type=%s value=%s created=%s",
@@ -126,19 +126,13 @@ async def run_scan(
     all_errors: list[str] = []
     modules_run: list[str] = []
 
-    # Step 2 — Execute each registered module for this target type.
     for module in _MODULE_REGISTRY[target_type]:
         modules_run.append(module.name)
-        logger.info(
-            "run_scan: executing module=%s for target_id=%s",
-            module.name,
-            target.id,
-        )
+        logger.info("run_scan: executing module=%s for target_id=%s", module.name, target.id)
 
         try:
-            result = await module.execute(target_type, target_value, **kwargs)
+            result = await module.execute(target_type, target_value, **options)
         except Exception as e:
-            # Module.execute() should never raise, but we catch anyway.
             error_msg = f"Module '{module.name}' raised unexpectedly: {e}"
             logger.exception(error_msg)
             all_errors.append(error_msg)
@@ -153,7 +147,6 @@ async def run_scan(
                 target.id,
             )
 
-        # Step 3 — Persist findings + evidence if any were produced.
         if result.findings:
             try:
                 stored_f, stored_e = await store_module_result(
@@ -182,3 +175,80 @@ async def run_scan(
         errors=all_errors,
         modules_run=modules_run,
     )
+
+
+async def run_scan_for_investigation(
+    db: AsyncSession,
+    *,
+    investigation_id: str,
+    target_type: str,
+    target_value: str,
+    options: dict | None = None,
+    role: str | None = None,
+) -> ScanResult:
+    """
+    Run a scan and automatically link the target to an investigation.
+
+    This combines run_scan() with add_target_to_investigation():
+    1. Run the scan (get-or-create target, execute modules, store results).
+    2. Link the target to the investigation if not already linked.
+       If the target is already linked, the existing link is silently kept —
+       no error is raised, since running a second scan on the same target
+       for the same investigation is a valid workflow (new findings accumulate).
+    3. Return the ScanResult (same shape as run_scan).
+
+    Raises ValueError if the investigation does not exist or is closed.
+    The caller (router) is responsible for converting ValueError to HTTP 400/404.
+
+    Args:
+        db: async SQLAlchemy session.
+        investigation_id: the investigation to link the target to.
+        target_type: canonical type string.
+        target_value: the value to investigate.
+        options: module-specific options (see run_scan).
+        role: optional role label for the link
+              (e.g. "initial_target", "pivot", "discovered_domain").
+    """
+    # Validate investigation exists and is open before running the scan.
+    inv = await inv_service.get_investigation(db, investigation_id)
+    if inv is None:
+        raise ValueError(f"Investigation '{investigation_id}' not found.")
+    if inv.status == "closed":
+        raise ValueError(
+            f"Investigation '{investigation_id}' is closed. Re-open it before running scans."
+        )
+
+    # Run the scan.
+    scan_result = await run_scan(
+        db,
+        target_type=target_type,
+        target_value=target_value,
+        options=options,
+    )
+
+    # Link target to investigation — ignore "already linked" silently.
+    try:
+        await inv_service.add_target_to_investigation(
+            db,
+            investigation_id=investigation_id,
+            target_id=scan_result.target.id,
+            role=role,
+        )
+        logger.info(
+            "run_scan_for_investigation: linked target_id=%s to investigation_id=%s role=%r",
+            scan_result.target.id,
+            investigation_id,
+            role,
+        )
+    except ValueError as e:
+        if "already linked" in str(e):
+            logger.info(
+                "run_scan_for_investigation: target_id=%s already in investigation_id=%s — skipped",
+                scan_result.target.id,
+                investigation_id,
+            )
+        else:
+            # Unexpected ValueError (closed race condition etc.) — surface it.
+            raise
+
+    return scan_result

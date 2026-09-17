@@ -15,10 +15,14 @@ router = APIRouter()
     description=(
         "Runs the OpenRecon pipeline for a given target. "
         "Creates or reuses a Target, executes the appropriate module(s), "
-        "stores all Findings and Evidence, and returns a structured result.\n\n"
-        "Currently supported target types: `username` (uses Sherlock).\n\n"
-        "For username scans, pass a `sites` list to restrict the scan to specific "
-        "platforms. Omit `sites` to scan all supported platforms."
+        "normalizes and deduplicates all Findings, stores Evidence, "
+        "and returns a structured result.\n\n"
+        "**Supported target types:**\n"
+        "- `username` — uses SherlockModule (480+ platforms)\n"
+        "- `domain`   — uses DNSModule (DNS records + crt.sh subdomains)\n\n"
+        "**Options:**\n"
+        '- Username: `{"sites": ["GitHub", "Reddit"]}` to restrict platforms\n'
+        "- Domain: no options currently needed"
     ),
     responses={
         400: {"model": ErrorResponse, "description": "Unsupported target type"},
@@ -38,15 +42,9 @@ async def scan(body: ScanRequest, db: AsyncSession = Depends(get_db)):
         db,
         target_type=body.target_type,
         target_value=body.target_value.strip(),
-        sites=body.sites,
+        options=body.options,
     )
 
-    # Build evidence index by finding_id (avoids lazy loading).
-    evidence_by_finding: dict[str, list] = {}
-    for e in result.evidence:
-        evidence_by_finding.setdefault(e.finding_id, []).append(e)
-
-    # Build findings list with their evidence.
     findings_out = []
     for f in result.findings:
         evidence_out = [
@@ -57,7 +55,7 @@ async def scan(body: ScanRequest, db: AsyncSession = Depends(get_db)):
                 "value": e.value,
                 "observed_at": str(e.observed_at),
             }
-            for e in evidence_by_finding.get(f.id, [])
+            for e in (f.evidence if f.evidence else [])
         ]
         findings_out.append(
             {
