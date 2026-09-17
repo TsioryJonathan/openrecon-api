@@ -6,8 +6,8 @@ from pydantic import BaseModel, Field
 
 
 class ResultItem(BaseModel):
-    site: str = Field(..., description="Platform name")
-    url: str = Field(..., description="Profile URL found")
+    site: str
+    url: str
 
 
 class SearchResponse(BaseModel):
@@ -104,27 +104,9 @@ class ReconResponse(BaseModel):
 
 
 class ScanRequest(BaseModel):
-    target_type: str = Field(
-        ...,
-        description="Type of the target. Supported: 'username', 'domain'.",
-        examples=["username", "domain"],
-    )
-    target_value: str = Field(
-        ...,
-        min_length=1,
-        max_length=253,
-        description="The value to investigate.",
-        examples=["john123", "example.com"],
-    )
-    options: dict = Field(
-        default_factory=dict,
-        description=(
-            "Module-specific options.\n"
-            'username → {"sites": ["GitHub", "Reddit"]}\n'
-            "domain   → no options currently used"
-        ),
-        examples=[{"sites": ["GitHub", "Reddit"]}, {}],
-    )
+    target_type: str = Field(..., examples=["username", "domain"])
+    target_value: str = Field(..., min_length=1, max_length=253, examples=["john123"])
+    options: dict = Field(default_factory=dict, examples=[{"sites": ["GitHub"]}, {}])
 
 
 class ScanEvidenceItem(BaseModel):
@@ -168,52 +150,21 @@ class ScanResponse(BaseModel):
 
 
 class InvestigationCreateRequest(BaseModel):
-    name: str = Field(
-        ...,
-        min_length=1,
-        max_length=200,
-        description="Short label for the investigation.",
-        examples=["john123 OSINT"],
-    )
-    description: str | None = Field(None, description="Optional free-text notes.")
+    name: str = Field(..., min_length=1, max_length=200, examples=["john123 OSINT"])
+    description: str | None = None
 
 
 class InvestigationAddTargetRequest(BaseModel):
-    target_type: str = Field(..., description="Type of the target.", examples=["username"])
+    target_type: str = Field(..., examples=["username"])
     target_value: str = Field(..., min_length=1, max_length=253, examples=["john123"])
-    role: str | None = Field(
-        None,
-        description="Optional role label.",
-        examples=["initial_target", "pivot", "discovered_domain"],
-    )
+    role: str | None = Field(None, examples=["initial_target"])
 
 
 class InvestigationScanRequest(BaseModel):
-    target_type: str = Field(
-        ...,
-        description="Type of the target. Supported: 'username', 'domain'.",
-        examples=["username", "domain"],
-    )
-    target_value: str = Field(
-        ...,
-        min_length=1,
-        max_length=253,
-        description="The value to investigate.",
-        examples=["john123"],
-    )
-    options: dict = Field(
-        default_factory=dict,
-        description="Module-specific options (same as POST /api/scan).",
-        examples=[{"sites": ["GitHub"]}, {}],
-    )
-    role: str | None = Field(
-        None,
-        description=(
-            "Role label for the target link in this investigation. "
-            "Examples: 'initial_target', 'pivot', 'discovered_domain'."
-        ),
-        examples=["initial_target"],
-    )
+    target_type: str = Field(..., examples=["username"])
+    target_value: str = Field(..., min_length=1, max_length=253, examples=["john123"])
+    options: dict = Field(default_factory=dict, examples=[{"sites": ["GitHub"]}, {}])
+    role: str | None = Field(None, examples=["initial_target"])
 
 
 class InvestigationTargetItem(BaseModel):
@@ -253,7 +204,49 @@ class InvestigationListResponse(BaseModel):
 
 
 class InvestigationScanResponse(BaseModel):
-    """Response for POST /api/investigations/{id}/scan."""
-
     scan: ScanResponse
     investigation: InvestigationSummaryResponse
+
+
+# ---------------------------------------------------------------------------
+# Correlation
+# ---------------------------------------------------------------------------
+
+
+class RelationItem(BaseModel):
+    id: str
+    source_finding_id: str
+    target_finding_id: str
+    relation_type: str
+    confidence: str
+    reason: str
+    created_at: str
+
+
+class CorrelationResponse(BaseModel):
+    investigation_id: str
+    relations_created: int
+    relations_skipped: int
+    errors: list[str] = Field(default_factory=list)
+    relations: list[RelationItem] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Report
+# ---------------------------------------------------------------------------
+
+
+class ReportResponse(BaseModel):
+    """
+    Structured JSON report for an investigation.
+    Returned when format=json (default).
+    For format=markdown, the endpoint returns text/markdown directly.
+    """
+
+    investigation: dict = Field(..., description="Investigation metadata.")
+    generated_at: str = Field(..., description="ISO timestamp of report generation.")
+    targets: list[dict] = Field(..., description="Targets with their findings and evidence.")
+    relations: list[dict] = Field(..., description="All relations in this investigation.")
+    timeline: list[dict] = Field(..., description="Chronological event log.")
+    sources: list[str] = Field(..., description="Unique source modules referenced.")
+    stats: dict = Field(..., description="Aggregate statistics.")

@@ -2,6 +2,7 @@ from app.models.Evidence import Evidence
 from app.models.Finding import Finding
 from app.models.Investigation import Investigation
 from app.models.InvestigationTarget import InvestigationTarget
+from app.models.Relation import Relation
 from app.models.Result import Result
 from app.models.Search import Search
 from app.models.Target import Target
@@ -11,6 +12,7 @@ __all__ = [
     "Finding",
     "Investigation",
     "InvestigationTarget",
+    "Relation",
     "Result",
     "Search",
     "Target",
