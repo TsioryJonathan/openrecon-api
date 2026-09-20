@@ -1,9 +1,9 @@
 openapi: 3.1.0
 info:
   title: OpenRecon API
-  description: OSINT reconnaissance API to find a user's presence across the web.
-    Uses sherlock-project to scan 480+ platforms.
-  version: 0.1.0
+  description: OSINT reconnaissance API. Modular, correlated, evidence-backed recon
+    engine.
+  version: 0.2.0
 paths:
   /api/sherlock/sites:
     get:
@@ -199,15 +199,22 @@ paths:
       - Scan
       summary: Run an OpenRecon scan
       description: 'Runs the OpenRecon pipeline for a given target. Creates or reuses
-        a Target, executes the appropriate module(s), stores all Findings and Evidence,
-        and returns a structured result.
+        a Target, executes the appropriate module(s), normalizes and deduplicates
+        all Findings, stores Evidence, and returns a structured result.
 
 
-        Currently supported target types: `username` (uses Sherlock).
+        **Supported target types:**
+
+        - `username` — uses SherlockModule (480+ platforms)
+
+        - `domain`   — uses DNSModule (DNS records + crt.sh subdomains)
 
 
-        For username scans, pass a `sites` list to restrict the scan to specific platforms.
-        Omit `sites` to scan all supported platforms.'
+        **Options:**
+
+        - Username: `{"sites": ["GitHub", "Reddit"]}` to restrict platforms
+
+        - Domain: no options currently needed'
       operationId: scan_api_scan_post
       requestBody:
         content:
@@ -234,6 +241,390 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/investigations:
+    post:
+      tags:
+      - Investigations
+      summary: Create a new investigation
+      operationId: create_investigation_api_investigations_post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvestigationCreateRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvestigationSummaryResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - Investigations
+      summary: List investigations
+      operationId: list_investigations_api_investigations_get
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 50
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 0
+          title: Offset
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvestigationListResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/investigations/{investigation_id}:
+    get:
+      tags:
+      - Investigations
+      summary: Get investigation summary
+      operationId: get_investigation_api_investigations__investigation_id__get
+      parameters:
+      - name: investigation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Investigation Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvestigationSummaryResponse'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/investigations/{investigation_id}/targets:
+    post:
+      tags:
+      - Investigations
+      summary: Add a target to an investigation
+      operationId: add_target_api_investigations__investigation_id__targets_post
+      parameters:
+      - name: investigation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Investigation Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvestigationAddTargetRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvestigationSummaryResponse'
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Bad Request
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/investigations/{investigation_id}/scan:
+    post:
+      tags:
+      - Investigations
+      summary: Run a scan within an investigation
+      operationId: scan_within_investigation_api_investigations__investigation_id__scan_post
+      parameters:
+      - name: investigation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Investigation Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvestigationScanRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvestigationScanResponse'
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Bad Request
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/investigations/{investigation_id}/adaptive-scan:
+    post:
+      tags:
+      - Investigations
+      summary: Run an adaptive multi-hop scan within an investigation
+      description: 'Run an adaptive recon scan starting from a single target.
+
+
+        The engine scans the initial target, extracts new leads from the findings
+
+        (domains, IPs, usernames found in profile URLs, etc.), and recursively
+
+        scans those leads up to `max_depth` hops.
+
+
+        Safety guarantees enforced by the engine:
+
+        - **Depth limit**: never exceeds `max_depth` hops.
+
+        - **Session dedup**: each (type, value) pair scanned at most once per run.
+
+        - **Scope**: only targets within the investigation''s scope are scanned.
+
+        - **Rate limit**: the process-wide rate limiter applies per (target, module).
+
+
+        All discovered targets are automatically linked to the investigation.
+
+        Returns a summary of all hops, findings, leads extracted/skipped.'
+      operationId: adaptive_scan_within_investigation_api_investigations__investigation_id__adaptive_scan_post
+      parameters:
+      - name: investigation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Investigation Id
+      - name: max_depth
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 4
+          minimum: 0
+          description: 'Maximum number of hops beyond the initial scan. 0 = scan only
+            the initial target (same as /scan). Default: 2. Maximum: 4.'
+          default: 2
+          title: Max Depth
+        description: 'Maximum number of hops beyond the initial scan. 0 = scan only
+          the initial target (same as /scan). Default: 2. Maximum: 4.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvestigationScanRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdaptiveScanResponse'
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Bad Request
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/investigations/{investigation_id}/correlate:
+    post:
+      tags:
+      - Investigations
+      summary: Run correlation across all targets in an investigation
+      operationId: correlate_investigation_api_investigations__investigation_id__correlate_post
+      parameters:
+      - name: investigation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Investigation Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CorrelationResponse'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/investigations/{investigation_id}/report:
+    get:
+      tags:
+      - Investigations
+      summary: Generate an investigation report
+      operationId: get_report_api_investigations__investigation_id__report_get
+      parameters:
+      - name: investigation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Investigation Id
+      - name: format
+        in: query
+        required: false
+        schema:
+          type: string
+          pattern: ^(json|markdown)$
+          description: 'Output format: ''json'' or ''markdown''.'
+          default: json
+          title: Format
+        description: 'Output format: ''json'' or ''markdown''.'
+      responses:
+        '200':
+          description: Report in requested format
+          content:
+            application/json:
+              schema: {}
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Bad Request
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/investigations/{investigation_id}/close:
+    post:
+      tags:
+      - Investigations
+      summary: Close an investigation
+      operationId: close_investigation_api_investigations__investigation_id__close_post
+      parameters:
+      - name: investigation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Investigation Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvestigationSummaryResponse'
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Bad Request
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /:
     get:
       summary: Health check
@@ -247,6 +638,143 @@ paths:
                 $ref: '#/components/schemas/MessageResponse'
 components:
   schemas:
+    AdaptiveHopItem:
+      properties:
+        depth:
+          type: integer
+          title: Depth
+        target_type:
+          type: string
+          title: Target Type
+        target_value:
+          type: string
+          title: Target Value
+        finding_count:
+          type: integer
+          title: Finding Count
+        evidence_count:
+          type: integer
+          title: Evidence Count
+        modules_run:
+          items:
+            type: string
+          type: array
+          title: Modules Run
+        errors:
+          items:
+            type: string
+          type: array
+          title: Errors
+        leads_extracted:
+          items:
+            $ref: '#/components/schemas/AdaptiveLeadItem'
+          type: array
+          title: Leads Extracted
+        source_lead:
+          anyOf:
+          - $ref: '#/components/schemas/AdaptiveLeadItem'
+          - type: 'null'
+      type: object
+      required:
+      - depth
+      - target_type
+      - target_value
+      - finding_count
+      - evidence_count
+      - modules_run
+      title: AdaptiveHopItem
+    AdaptiveLeadItem:
+      properties:
+        target_type:
+          type: string
+          title: Target Type
+        target_value:
+          type: string
+          title: Target Value
+        rule:
+          type: string
+          title: Rule
+          description: Which extraction rule produced this lead.
+        source_finding_id:
+          type: string
+          title: Source Finding Id
+      type: object
+      required:
+      - target_type
+      - target_value
+      - rule
+      - source_finding_id
+      title: AdaptiveLeadItem
+    AdaptiveScanResponse:
+      properties:
+        investigation_id:
+          type: string
+          title: Investigation Id
+        max_depth:
+          type: integer
+          title: Max Depth
+          description: Maximum hops configured for this run.
+        hop_count:
+          type: integer
+          title: Hop Count
+          description: Total number of hops executed.
+        targets_scanned:
+          items:
+            $ref: '#/components/schemas/AdaptiveTargetItem'
+          type: array
+          title: Targets Scanned
+          description: All (type, value) pairs scanned in this run.
+        total_finding_count:
+          type: integer
+          title: Total Finding Count
+        total_evidence_count:
+          type: integer
+          title: Total Evidence Count
+        hops:
+          items:
+            $ref: '#/components/schemas/AdaptiveHopItem'
+          type: array
+          title: Hops
+          description: Per-hop results, depth 0 first.
+        leads_skipped:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: Leads Skipped
+          description: Leads not scanned (out of scope, deduped, unsupported type,
+            depth exceeded).
+        errors:
+          items:
+            type: string
+          type: array
+          title: Errors
+        investigation:
+          $ref: '#/components/schemas/InvestigationSummaryResponse'
+      type: object
+      required:
+      - investigation_id
+      - max_depth
+      - hop_count
+      - targets_scanned
+      - total_finding_count
+      - total_evidence_count
+      - hops
+      - investigation
+      title: AdaptiveScanResponse
+    AdaptiveTargetItem:
+      properties:
+        type:
+          type: string
+          title: Type
+        value:
+          type: string
+          title: Value
+      type: object
+      required:
+      - type
+      - value
+      title: AdaptiveTargetItem
     Body_extract_api_exif_extract_post:
       properties:
         file:
@@ -262,34 +790,56 @@ components:
         name:
           type: string
           title: Name
-          description: Category name
         sites:
           items:
             type: string
           type: array
           title: Sites
-          description: List of site names in this category
       type: object
       required:
       - name
       - sites
       title: CategorySites
+    CorrelationResponse:
+      properties:
+        investigation_id:
+          type: string
+          title: Investigation Id
+        relations_created:
+          type: integer
+          title: Relations Created
+        relations_skipped:
+          type: integer
+          title: Relations Skipped
+        errors:
+          items:
+            type: string
+          type: array
+          title: Errors
+        relations:
+          items:
+            $ref: '#/components/schemas/RelationItem'
+          type: array
+          title: Relations
+      type: object
+      required:
+      - investigation_id
+      - relations_created
+      - relations_skipped
+      title: CorrelationResponse
     DorkCategory:
       properties:
         name:
           type: string
           title: Name
-          description: Category name
         description:
           type: string
           title: Description
-          description: What this category covers
         dorks:
           items:
             $ref: '#/components/schemas/DorkItem'
           type: array
           title: Dorks
-          description: List of dorks in this category
       type: object
       required:
       - name
@@ -303,7 +853,6 @@ components:
           maxLength: 64
           minLength: 1
           title: Target
-          description: Target to generate dorks for (username, email, domain, or name)
           examples:
           - john_doe
       type: object
@@ -315,17 +864,14 @@ components:
         target:
           type: string
           title: Target
-          description: The target that was used
         total:
           type: integer
           title: Total
-          description: Total number of dorks generated
         categories:
           items:
             $ref: '#/components/schemas/DorkCategory'
           type: array
           title: Categories
-          description: Dorks grouped by category
       type: object
       required:
       - target
@@ -337,15 +883,12 @@ components:
         title:
           type: string
           title: Title
-          description: Human-readable name for this dork
         query:
           type: string
           title: Query
-          description: The Google dork query string
         url:
           type: string
           title: Url
-          description: Direct Google search URL
       type: object
       required:
       - title
@@ -366,87 +909,73 @@ components:
         filename:
           type: string
           title: Filename
-          description: Original filename
         has_gps:
           type: boolean
           title: Has Gps
-          description: Whether GPS coordinates were found
         gps:
           anyOf:
           - additionalProperties: true
             type: object
           - type: 'null'
           title: Gps
-          description: GPS data (lat, lon, altitude)
         device:
           anyOf:
           - additionalProperties: true
             type: object
           - type: 'null'
           title: Device
-          description: Device info (make, model)
         lens:
           anyOf:
           - type: string
           - type: 'null'
           title: Lens
-          description: Lens model
         camera_settings:
           anyOf:
           - additionalProperties: true
             type: object
           - type: 'null'
           title: Camera Settings
-          description: Camera settings (focal length, aperture, ISO, etc.)
         image:
           anyOf:
           - additionalProperties: true
             type: object
           - type: 'null'
           title: Image
-          description: Image info (dimensions, color space)
         flash:
           anyOf:
           - type: string
           - type: 'null'
           title: Flash
-          description: Flash info
         white_balance:
           anyOf:
           - type: string
           - type: 'null'
           title: White Balance
-          description: White balance setting
         scene_type:
           anyOf:
           - type: string
           - type: 'null'
           title: Scene Type
-          description: Scene type
         datetime:
           anyOf:
           - type: string
           - type: 'null'
           title: Datetime
-          description: Original capture date/time
         software:
           anyOf:
           - type: string
           - type: 'null'
           title: Software
-          description: Software used to process the image
         artist:
           anyOf:
           - type: string
           - type: 'null'
           title: Artist
-          description: Artist/owner name
         copyright:
           anyOf:
           - type: string
           - type: 'null'
           title: Copyright
-          description: Copyright information
       type: object
       required:
       - filename
@@ -457,13 +986,11 @@ components:
         username:
           type: string
           title: Username
-          description: Searched username
         searches:
           items:
             $ref: '#/components/schemas/SearchResultEntry'
           type: array
           title: Searches
-          description: Search history
       type: object
       required:
       - username
@@ -478,6 +1005,220 @@ components:
           title: Detail
       type: object
       title: HTTPValidationError
+    InvestigationAddTargetRequest:
+      properties:
+        target_type:
+          type: string
+          title: Target Type
+          examples:
+          - username
+        target_value:
+          type: string
+          maxLength: 253
+          minLength: 1
+          title: Target Value
+          examples:
+          - john123
+        role:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Role
+          examples:
+          - initial_target
+      type: object
+      required:
+      - target_type
+      - target_value
+      title: InvestigationAddTargetRequest
+    InvestigationCreateRequest:
+      properties:
+        name:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Name
+          examples:
+          - john123 OSINT
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+      type: object
+      required:
+      - name
+      title: InvestigationCreateRequest
+    InvestigationListItem:
+      properties:
+        id:
+          type: string
+          title: Id
+        name:
+          type: string
+          title: Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        status:
+          type: string
+          title: Status
+        created_at:
+          type: string
+          title: Created At
+        updated_at:
+          type: string
+          title: Updated At
+      type: object
+      required:
+      - id
+      - name
+      - description
+      - status
+      - created_at
+      - updated_at
+      title: InvestigationListItem
+    InvestigationListResponse:
+      properties:
+        total:
+          type: integer
+          title: Total
+        investigations:
+          items:
+            $ref: '#/components/schemas/InvestigationListItem'
+          type: array
+          title: Investigations
+      type: object
+      required:
+      - total
+      - investigations
+      title: InvestigationListResponse
+    InvestigationScanRequest:
+      properties:
+        target_type:
+          type: string
+          title: Target Type
+          examples:
+          - username
+        target_value:
+          type: string
+          maxLength: 253
+          minLength: 1
+          title: Target Value
+          examples:
+          - john123
+        options:
+          additionalProperties: true
+          type: object
+          title: Options
+          examples:
+          - sites:
+            - GitHub
+          - {}
+        role:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Role
+          examples:
+          - initial_target
+      type: object
+      required:
+      - target_type
+      - target_value
+      title: InvestigationScanRequest
+    InvestigationScanResponse:
+      properties:
+        scan:
+          $ref: '#/components/schemas/ScanResponse'
+        investigation:
+          $ref: '#/components/schemas/InvestigationSummaryResponse'
+      type: object
+      required:
+      - scan
+      - investigation
+      title: InvestigationScanResponse
+    InvestigationSummaryResponse:
+      properties:
+        id:
+          type: string
+          title: Id
+        name:
+          type: string
+          title: Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        status:
+          type: string
+          title: Status
+        created_at:
+          type: string
+          title: Created At
+        updated_at:
+          type: string
+          title: Updated At
+        target_count:
+          type: integer
+          title: Target Count
+        finding_count:
+          type: integer
+          title: Finding Count
+        evidence_count:
+          type: integer
+          title: Evidence Count
+        targets:
+          items:
+            $ref: '#/components/schemas/InvestigationTargetItem'
+          type: array
+          title: Targets
+      type: object
+      required:
+      - id
+      - name
+      - description
+      - status
+      - created_at
+      - updated_at
+      - target_count
+      - finding_count
+      - evidence_count
+      title: InvestigationSummaryResponse
+    InvestigationTargetItem:
+      properties:
+        id:
+          type: string
+          title: Id
+        type:
+          type: string
+          title: Type
+        value:
+          type: string
+          title: Value
+        role:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Role
+        added_at:
+          type: string
+          title: Added At
+        finding_count:
+          type: integer
+          title: Finding Count
+      type: object
+      required:
+      - id
+      - type
+      - value
+      - role
+      - added_at
+      - finding_count
+      title: InvestigationTargetItem
     MessageResponse:
       properties:
         message:
@@ -492,32 +1233,60 @@ components:
         query:
           type: string
           title: Query
-          description: Original query
         type:
           type: string
           title: Type
-          description: 'Type of query: ''ip'' or ''domain'''
         data:
           additionalProperties: true
           type: object
           title: Data
-          description: Recon results
       type: object
       required:
       - query
       - type
       - data
       title: ReconResponse
+    RelationItem:
+      properties:
+        id:
+          type: string
+          title: Id
+        source_finding_id:
+          type: string
+          title: Source Finding Id
+        target_finding_id:
+          type: string
+          title: Target Finding Id
+        relation_type:
+          type: string
+          title: Relation Type
+        confidence:
+          type: string
+          title: Confidence
+        reason:
+          type: string
+          title: Reason
+        created_at:
+          type: string
+          title: Created At
+      type: object
+      required:
+      - id
+      - source_finding_id
+      - target_finding_id
+      - relation_type
+      - confidence
+      - reason
+      - created_at
+      title: RelationItem
     ResultItem:
       properties:
         site:
           type: string
           title: Site
-          description: Platform name
         url:
           type: string
           title: Url
-          description: Profile URL found
       type: object
       required:
       - site
@@ -528,23 +1297,18 @@ components:
         id:
           type: string
           title: Id
-          description: Evidence ID
         source:
           type: string
           title: Source
-          description: Module that produced this evidence
         evidence_type:
           type: string
           title: Evidence Type
-          description: Kind of evidence (e.g. 'url')
         value:
           type: string
           title: Value
-          description: Raw evidence value
         observed_at:
           type: string
           title: Observed At
-          description: ISO timestamp
       type: object
       required:
       - id
@@ -558,37 +1322,29 @@ components:
         id:
           type: string
           title: Id
-          description: Finding ID
         type:
           type: string
           title: Type
-          description: Finding type (e.g. 'social_account')
         value:
           type: string
           title: Value
-          description: Finding value (e.g. a profile URL)
         source:
           type: string
           title: Source
-          description: Module that produced this finding
         confidence:
           type: string
           title: Confidence
-          description: CONFIRMED / LIKELY / POSSIBLE
         confidence_reason:
           type: string
           title: Confidence Reason
-          description: Why this confidence was assigned
         observed_at:
           type: string
           title: Observed At
-          description: ISO timestamp
         evidence:
           items:
             $ref: '#/components/schemas/ScanEvidenceItem'
           type: array
           title: Evidence
-          description: Evidence backing this finding
       type: object
       required:
       - id
@@ -604,28 +1360,24 @@ components:
         target_type:
           type: string
           title: Target Type
-          description: 'Type of the target. Currently supported: ''username''.'
           examples:
           - username
+          - domain
         target_value:
           type: string
-          maxLength: 128
+          maxLength: 253
           minLength: 1
           title: Target Value
-          description: The value to investigate (e.g. a username, domain, or IP).
           examples:
           - john123
-        sites:
-          items:
-            type: string
-          type: array
-          title: Sites
-          description: 'For username scans: restrict to these Sherlock site names.
-            Omit or pass an empty list to scan all supported sites.'
+        options:
+          additionalProperties: true
+          type: object
+          title: Options
           examples:
-          - - GitHub
-            - Reddit
-            - Twitter
+          - sites:
+            - GitHub
+          - {}
       type: object
       required:
       - target_type
@@ -635,33 +1387,27 @@ components:
       properties:
         target:
           $ref: '#/components/schemas/ScanTargetItem'
-          description: The investigated target
         finding_count:
           type: integer
           title: Finding Count
-          description: Total findings stored
         evidence_count:
           type: integer
           title: Evidence Count
-          description: Total evidence stored
         modules_run:
           items:
             type: string
           type: array
           title: Modules Run
-          description: Modules that were executed
         findings:
           items:
             $ref: '#/components/schemas/ScanFindingItem'
           type: array
           title: Findings
-          description: All findings from this scan
         errors:
           items:
             type: string
           type: array
           title: Errors
-          description: Errors encountered during the scan (partial results possible)
       type: object
       required:
       - target
@@ -675,19 +1421,15 @@ components:
         id:
           type: string
           title: Id
-          description: Target ID
         type:
           type: string
           title: Type
-          description: Target type
         value:
           type: string
           title: Value
-          description: Target value
         created_at:
           type: string
           title: Created At
-          description: ISO timestamp
       type: object
       required:
       - id
@@ -724,13 +1466,11 @@ components:
         username:
           type: string
           title: Username
-          description: Searched username
         results:
           items:
             $ref: '#/components/schemas/ResultItem'
           type: array
           title: Results
-          description: Found results
       type: object
       required:
       - username
@@ -741,17 +1481,14 @@ components:
         id:
           type: string
           title: Id
-          description: Unique search ID
         created_at:
           type: string
           title: Created At
-          description: Search timestamp
         results:
           items:
             $ref: '#/components/schemas/ResultItem'
           type: array
           title: Results
-          description: Results from this search
       type: object
       required:
       - id
@@ -765,11 +1502,9 @@ components:
             $ref: '#/components/schemas/CategorySites'
           type: array
           title: Categories
-          description: Sites grouped by category
         total:
           type: integer
           title: Total
-          description: Total number of supported sites
       type: object
       required:
       - categories
