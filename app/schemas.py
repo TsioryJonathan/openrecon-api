@@ -6,24 +6,24 @@ from pydantic import BaseModel, Field
 
 
 class ResultItem(BaseModel):
-    site: str = Field(..., description="Platform name")
-    url: str = Field(..., description="Profile URL found")
+    site: str
+    url: str
 
 
 class SearchResponse(BaseModel):
-    username: str = Field(..., description="Searched username")
-    results: list[ResultItem] = Field(..., description="Found results")
+    username: str
+    results: list[ResultItem]
 
 
 class SearchResultEntry(BaseModel):
-    id: str = Field(..., description="Unique search ID")
-    created_at: str = Field(..., description="Search timestamp")
-    results: list[ResultItem] = Field(..., description="Results from this search")
+    id: str
+    created_at: str
+    results: list[ResultItem]
 
 
 class GetResultsResponse(BaseModel):
-    username: str = Field(..., description="Searched username")
-    searches: list[SearchResultEntry] = Field(..., description="Search history")
+    username: str
+    searches: list[SearchResultEntry]
 
 
 class MessageResponse(BaseModel):
@@ -35,141 +35,259 @@ class ErrorResponse(BaseModel):
 
 
 class CategorySites(BaseModel):
-    name: str = Field(..., description="Category name")
-    sites: list[str] = Field(..., description="List of site names in this category")
+    name: str
+    sites: list[str]
 
 
 class SitesResponse(BaseModel):
-    categories: list[CategorySites] = Field(..., description="Sites grouped by category")
-    total: int = Field(..., description="Total number of supported sites")
+    categories: list[CategorySites]
+    total: int
 
 
-# --- Dork (existing — do not modify) ---
+# --- Dork ---
 
 
 class DorkItem(BaseModel):
-    title: str = Field(..., description="Human-readable name for this dork")
-    query: str = Field(..., description="The Google dork query string")
-    url: str = Field(..., description="Direct Google search URL")
+    title: str
+    query: str
+    url: str
 
 
 class DorkCategory(BaseModel):
-    name: str = Field(..., description="Category name")
-    description: str = Field(..., description="What this category covers")
-    dorks: list[DorkItem] = Field(..., description="List of dorks in this category")
+    name: str
+    description: str
+    dorks: list[DorkItem]
 
 
 class DorkGenerateRequest(BaseModel):
-    target: str = Field(
-        ...,
-        min_length=1,
-        max_length=64,
-        description="Target to generate dorks for (username, email, domain, or name)",
-        examples=["john_doe"],
-    )
+    target: str = Field(..., min_length=1, max_length=64, examples=["john_doe"])
 
 
 class DorkGenerateResponse(BaseModel):
-    target: str = Field(..., description="The target that was used")
-    total: int = Field(..., description="Total number of dorks generated")
-    categories: list[DorkCategory] = Field(..., description="Dorks grouped by category")
+    target: str
+    total: int
+    categories: list[DorkCategory]
 
 
-# --- EXIF (existing — do not modify) ---
+# --- EXIF ---
 
 
 class ExifResponse(BaseModel):
-    filename: str = Field(..., description="Original filename")
-    has_gps: bool = Field(..., description="Whether GPS coordinates were found")
-    gps: dict | None = Field(None, description="GPS data (lat, lon, altitude)")
-    device: dict | None = Field(None, description="Device info (make, model)")
-    lens: str | None = Field(None, description="Lens model")
-    camera_settings: dict | None = Field(
-        None, description="Camera settings (focal length, aperture, ISO, etc.)"
-    )
-    image: dict | None = Field(None, description="Image info (dimensions, color space)")
-    flash: str | None = Field(None, description="Flash info")
-    white_balance: str | None = Field(None, description="White balance setting")
-    scene_type: str | None = Field(None, description="Scene type")
-    datetime: str | None = Field(None, description="Original capture date/time")
-    software: str | None = Field(None, description="Software used to process the image")
-    artist: str | None = Field(None, description="Artist/owner name")
-    copyright: str | None = Field(None, description="Copyright information")
+    filename: str
+    has_gps: bool
+    gps: dict | None = None
+    device: dict | None = None
+    lens: str | None = None
+    camera_settings: dict | None = None
+    image: dict | None = None
+    flash: str | None = None
+    white_balance: str | None = None
+    scene_type: str | None = None
+    datetime: str | None = None
+    software: str | None = None
+    artist: str | None = None
+    copyright: str | None = None
 
 
-# --- Recon (existing — do not modify) ---
+# --- Recon ---
 
 
 class ReconResponse(BaseModel):
-    query: str = Field(..., description="Original query")
-    type: str = Field(..., description="Type of query: 'ip' or 'domain'")
-    data: dict = Field(..., description="Recon results")
+    query: str
+    type: str
+    data: dict
 
 
 # ---------------------------------------------------------------------------
-# Scan — new
+# Scan
 # ---------------------------------------------------------------------------
 
 
 class ScanRequest(BaseModel):
-    target_type: str = Field(
-        ...,
-        description="Type of the target. Currently supported: 'username'.",
-        examples=["username"],
-    )
-    target_value: str = Field(
-        ...,
-        min_length=1,
-        max_length=128,
-        description="The value to investigate (e.g. a username, domain, or IP).",
-        examples=["john123"],
-    )
-    sites: list[str] = Field(
-        default_factory=list,
-        description=(
-            "For username scans: restrict to these Sherlock site names. "
-            "Omit or pass an empty list to scan all supported sites."
-        ),
-        examples=[["GitHub", "Reddit", "Twitter"]],
-    )
+    target_type: str = Field(..., examples=["username", "domain"])
+    target_value: str = Field(..., min_length=1, max_length=253, examples=["john123"])
+    options: dict = Field(default_factory=dict, examples=[{"sites": ["GitHub"]}, {}])
 
 
 class ScanEvidenceItem(BaseModel):
-    id: str = Field(..., description="Evidence ID")
-    source: str = Field(..., description="Module that produced this evidence")
-    evidence_type: str = Field(..., description="Kind of evidence (e.g. 'url')")
-    value: str = Field(..., description="Raw evidence value")
-    observed_at: str = Field(..., description="ISO timestamp")
+    id: str
+    source: str
+    evidence_type: str
+    value: str
+    observed_at: str
 
 
 class ScanFindingItem(BaseModel):
-    id: str = Field(..., description="Finding ID")
-    type: str = Field(..., description="Finding type (e.g. 'social_account')")
-    value: str = Field(..., description="Finding value (e.g. a profile URL)")
-    source: str = Field(..., description="Module that produced this finding")
-    confidence: str = Field(..., description="CONFIRMED / LIKELY / POSSIBLE")
-    confidence_reason: str = Field(..., description="Why this confidence was assigned")
-    observed_at: str = Field(..., description="ISO timestamp")
-    evidence: list[ScanEvidenceItem] = Field(
-        default_factory=list,
-        description="Evidence backing this finding",
-    )
+    id: str
+    type: str
+    value: str
+    source: str
+    confidence: str
+    confidence_reason: str
+    observed_at: str
+    evidence: list[ScanEvidenceItem] = Field(default_factory=list)
 
 
 class ScanTargetItem(BaseModel):
-    id: str = Field(..., description="Target ID")
-    type: str = Field(..., description="Target type")
-    value: str = Field(..., description="Target value")
-    created_at: str = Field(..., description="ISO timestamp")
+    id: str
+    type: str
+    value: str
+    created_at: str
 
 
 class ScanResponse(BaseModel):
-    target: ScanTargetItem = Field(..., description="The investigated target")
-    finding_count: int = Field(..., description="Total findings stored")
-    evidence_count: int = Field(..., description="Total evidence stored")
-    modules_run: list[str] = Field(..., description="Modules that were executed")
-    findings: list[ScanFindingItem] = Field(..., description="All findings from this scan")
-    errors: list[str] = Field(
-        default_factory=list,
-        description="Errors encountered during the scan (partial results possible)",
+    target: ScanTargetItem
+    finding_count: int
+    evidence_count: int
+    modules_run: list[str]
+    findings: list[ScanFindingItem]
+    errors: list[str] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Investigation
+# ---------------------------------------------------------------------------
+
+
+class InvestigationCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=200, examples=["john123 OSINT"])
+    description: str | None = None
+
+
+class InvestigationAddTargetRequest(BaseModel):
+    target_type: str = Field(..., examples=["username"])
+    target_value: str = Field(..., min_length=1, max_length=253, examples=["john123"])
+    role: str | None = Field(None, examples=["initial_target"])
+
+
+class InvestigationScanRequest(BaseModel):
+    target_type: str = Field(..., examples=["username"])
+    target_value: str = Field(..., min_length=1, max_length=253, examples=["john123"])
+    options: dict = Field(default_factory=dict, examples=[{"sites": ["GitHub"]}, {}])
+    role: str | None = Field(None, examples=["initial_target"])
+
+
+class InvestigationTargetItem(BaseModel):
+    id: str
+    type: str
+    value: str
+    role: str | None
+    added_at: str
+    finding_count: int
+
+
+class InvestigationSummaryResponse(BaseModel):
+    id: str
+    name: str
+    description: str | None
+    status: str
+    created_at: str
+    updated_at: str
+    target_count: int
+    finding_count: int
+    evidence_count: int
+    targets: list[InvestigationTargetItem] = Field(default_factory=list)
+
+
+class InvestigationListItem(BaseModel):
+    id: str
+    name: str
+    description: str | None
+    status: str
+    created_at: str
+    updated_at: str
+
+
+class InvestigationListResponse(BaseModel):
+    total: int
+    investigations: list[InvestigationListItem]
+
+
+class InvestigationScanResponse(BaseModel):
+    scan: ScanResponse
+    investigation: InvestigationSummaryResponse
+
+
+# ---------------------------------------------------------------------------
+# Correlation
+# ---------------------------------------------------------------------------
+
+
+class RelationItem(BaseModel):
+    id: str
+    source_finding_id: str
+    target_finding_id: str
+    relation_type: str
+    confidence: str
+    reason: str
+    created_at: str
+
+
+class CorrelationResponse(BaseModel):
+    investigation_id: str
+    relations_created: int
+    relations_skipped: int
+    errors: list[str] = Field(default_factory=list)
+    relations: list[RelationItem] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Report
+# ---------------------------------------------------------------------------
+
+
+class ReportResponse(BaseModel):
+    investigation: dict
+    generated_at: str
+    targets: list[dict]
+    relations: list[dict]
+    timeline: list[dict]
+    sources: list[str]
+    stats: dict
+
+
+# ---------------------------------------------------------------------------
+# Adaptive scan
+# ---------------------------------------------------------------------------
+
+
+class AdaptiveLeadItem(BaseModel):
+    target_type: str
+    target_value: str
+    rule: str = Field(..., description="Which extraction rule produced this lead.")
+    source_finding_id: str
+
+
+class AdaptiveHopItem(BaseModel):
+    depth: int
+    target_type: str
+    target_value: str
+    finding_count: int
+    evidence_count: int
+    modules_run: list[str]
+    errors: list[str] = Field(default_factory=list)
+    leads_extracted: list[AdaptiveLeadItem] = Field(default_factory=list)
+    source_lead: AdaptiveLeadItem | None = None
+
+
+class AdaptiveTargetItem(BaseModel):
+    type: str
+    value: str
+
+
+class AdaptiveScanResponse(BaseModel):
+    investigation_id: str
+    max_depth: int = Field(..., description="Maximum hops configured for this run.")
+    hop_count: int = Field(..., description="Total number of hops executed.")
+    targets_scanned: list[AdaptiveTargetItem] = Field(
+        ..., description="All (type, value) pairs scanned in this run."
     )
+    total_finding_count: int
+    total_evidence_count: int
+    hops: list[AdaptiveHopItem] = Field(..., description="Per-hop results, depth 0 first.")
+    leads_skipped: list[dict] = Field(
+        default_factory=list,
+        description="Leads not scanned (out of scope, deduped, unsupported type, depth exceeded).",
+    )
+    errors: list[str] = Field(default_factory=list)
+    investigation: InvestigationSummaryResponse

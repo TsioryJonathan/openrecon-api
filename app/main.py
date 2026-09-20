@@ -8,13 +8,7 @@ from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import PlainTextResponse
 
 from app.db.database import Base, engine
-from app.routers import (
-    dork,
-    exif,
-    recon,
-    scan,  # new
-    sherlock,
-)
+from app.routers import dork, exif, investigation, recon, scan, sherlock
 from app.schemas import MessageResponse
 
 OPENAPI_PATH = Path(__file__).parent.parent / "openapi.yaml"
@@ -30,9 +24,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="OpenRecon API",
-    description="OSINT reconnaissance API to find a user's presence across the web. "
-    "Uses sherlock-project to scan 480+ platforms.",
-    version="0.1.0",
+    description=("OSINT reconnaissance API. Modular, correlated, evidence-backed recon engine."),
+    version="0.2.0",
     lifespan=lifespan,
     docs_url=None,
     redoc_url=None,
@@ -49,7 +42,8 @@ app.include_router(sherlock.router, prefix="/api/sherlock", tags=["Sherlock"])
 app.include_router(dork.router, prefix="/api/dork", tags=["Dork"])
 app.include_router(exif.router, prefix="/api/exif", tags=["EXIF"])
 app.include_router(recon.router, prefix="/api/recon", tags=["Recon"])
-app.include_router(scan.router, prefix="/api/scan", tags=["Scan"])  # new
+app.include_router(scan.router, prefix="/api/scan", tags=["Scan"])
+app.include_router(investigation.router, prefix="/api/investigations", tags=["Investigations"])
 
 
 @app.get("/", response_model=MessageResponse, summary="Health check")
