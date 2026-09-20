@@ -237,16 +237,57 @@ class CorrelationResponse(BaseModel):
 
 
 class ReportResponse(BaseModel):
-    """
-    Structured JSON report for an investigation.
-    Returned when format=json (default).
-    For format=markdown, the endpoint returns text/markdown directly.
-    """
+    investigation: dict
+    generated_at: str
+    targets: list[dict]
+    relations: list[dict]
+    timeline: list[dict]
+    sources: list[str]
+    stats: dict
 
-    investigation: dict = Field(..., description="Investigation metadata.")
-    generated_at: str = Field(..., description="ISO timestamp of report generation.")
-    targets: list[dict] = Field(..., description="Targets with their findings and evidence.")
-    relations: list[dict] = Field(..., description="All relations in this investigation.")
-    timeline: list[dict] = Field(..., description="Chronological event log.")
-    sources: list[str] = Field(..., description="Unique source modules referenced.")
-    stats: dict = Field(..., description="Aggregate statistics.")
+
+# ---------------------------------------------------------------------------
+# Adaptive scan
+# ---------------------------------------------------------------------------
+
+
+class AdaptiveLeadItem(BaseModel):
+    target_type: str
+    target_value: str
+    rule: str = Field(..., description="Which extraction rule produced this lead.")
+    source_finding_id: str
+
+
+class AdaptiveHopItem(BaseModel):
+    depth: int
+    target_type: str
+    target_value: str
+    finding_count: int
+    evidence_count: int
+    modules_run: list[str]
+    errors: list[str] = Field(default_factory=list)
+    leads_extracted: list[AdaptiveLeadItem] = Field(default_factory=list)
+    source_lead: AdaptiveLeadItem | None = None
+
+
+class AdaptiveTargetItem(BaseModel):
+    type: str
+    value: str
+
+
+class AdaptiveScanResponse(BaseModel):
+    investigation_id: str
+    max_depth: int = Field(..., description="Maximum hops configured for this run.")
+    hop_count: int = Field(..., description="Total number of hops executed.")
+    targets_scanned: list[AdaptiveTargetItem] = Field(
+        ..., description="All (type, value) pairs scanned in this run."
+    )
+    total_finding_count: int
+    total_evidence_count: int
+    hops: list[AdaptiveHopItem] = Field(..., description="Per-hop results, depth 0 first.")
+    leads_skipped: list[dict] = Field(
+        default_factory=list,
+        description="Leads not scanned (out of scope, deduped, unsupported type, depth exceeded).",
+    )
+    errors: list[str] = Field(default_factory=list)
+    investigation: InvestigationSummaryResponse

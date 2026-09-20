@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db
 from app.schemas import (
+    AdaptiveScanResponse,
     CorrelationResponse,
     ErrorResponse,
     InvestigationAddTargetRequest,
@@ -14,6 +15,7 @@ from app.schemas import (
     InvestigationSummaryResponse,
 )
 from app.services import investigation as inv_service
+from app.services.adaptive import DEFAULT_MAX_DEPTH, run_adaptive_scan
 from app.services.correlation import run_correlation_for_investigation
 from app.services.report import build_report_data, render_json, render_markdown
 from app.services.scan import SUPPORTED_TARGET_TYPES, run_scan_for_investigation
@@ -197,6 +199,124 @@ async def scan_within_investigation(
 
 
 @router.post(
+    "/{investigation_id}/adaptive-scan",
+    response_model=AdaptiveScanResponse,
+    summary="Run an adaptive multi-hop scan within an investigation",
+    status_code=201,
+    responses={
+        400: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+    },
+)
+async def adaptive_scan_within_investigation(
+    investigation_id: str,
+    body: InvestigationScanRequest,
+    max_depth: int = Query(
+        default=DEFAULT_MAX_DEPTH,
+        ge=0,
+        le=4,
+        description=(
+            "Maximum number of hops beyond the initial scan. "
+            "0 = scan only the initial target (same as /scan). "
+            "Default: 2. Maximum: 4."
+        ),
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Run an adaptive recon scan starting from a single target.
+
+    The engine scans the initial target, extracts new leads from the findings
+    (domains, IPs, usernames found in profile URLs, etc.), and recursively
+    scans those leads up to `max_depth` hops.
+
+    Safety guarantees enforced by the engine:
+    - **Depth limit**: never exceeds `max_depth` hops.
+    - **Session dedup**: each (type, value) pair scanned at most once per run.
+    - **Scope**: only targets within the investigation's scope are scanned.
+    - **Rate limit**: the process-wide rate limiter applies per (target, module).
+
+    All discovered targets are automatically linked to the investigation.
+    Returns a summary of all hops, findings, leads extracted/skipped.
+    """
+    if body.target_type not in SUPPORTED_TARGET_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Unsupported target type '{body.target_type}'. "
+                f"Supported: {', '.join(SUPPORTED_TARGET_TYPES)}."
+            ),
+        )
+
+    inv = await inv_service.get_investigation(db, investigation_id)
+    if inv is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Investigation '{investigation_id}' not found.",
+        )
+    if inv.status == "closed":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Investigation '{investigation_id}' is closed.",
+        )
+
+    adaptive_result = await run_adaptive_scan(
+        db,
+        target_type=body.target_type,
+        target_value=body.target_value.strip(),
+        options=body.options,
+        max_depth=max_depth,
+        investigation_id=investigation_id,
+    )
+
+    hops_out = []
+    for hop in adaptive_result.hops:
+        hops_out.append(
+            {
+                "depth": hop.depth,
+                "target_type": hop.target_type,
+                "target_value": hop.target_value,
+                "finding_count": hop.scan_result.finding_count,
+                "evidence_count": hop.scan_result.evidence_count,
+                "modules_run": hop.scan_result.modules_run,
+                "errors": hop.scan_result.errors,
+                "leads_extracted": [
+                    {
+                        "target_type": lead.target_type,
+                        "target_value": lead.target_value,
+                        "rule": lead.rule,
+                        "source_finding_id": lead.source_finding_id,
+                    }
+                    for lead in hop.leads_extracted
+                ],
+                "source_lead": {
+                    "target_type": hop.source_lead.target_type,
+                    "target_value": hop.source_lead.target_value,
+                    "rule": hop.source_lead.rule,
+                    "source_finding_id": hop.source_lead.source_finding_id,
+                }
+                if hop.source_lead
+                else None,
+            }
+        )
+
+    return {
+        "investigation_id": investigation_id,
+        "max_depth": max_depth,
+        "hop_count": adaptive_result.hop_count,
+        "targets_scanned": [
+            {"type": t, "value": v} for t, v in sorted(adaptive_result.targets_scanned)
+        ],
+        "total_finding_count": adaptive_result.finding_count,
+        "total_evidence_count": adaptive_result.evidence_count,
+        "hops": hops_out,
+        "leads_skipped": adaptive_result.leads_skipped,
+        "errors": adaptive_result.errors,
+        "investigation": await inv_service.get_investigation_summary(db, investigation_id),
+    }
+
+
+@router.post(
     "/{investigation_id}/correlate",
     response_model=CorrelationResponse,
     summary="Run correlation across all targets in an investigation",
@@ -237,50 +357,30 @@ async def correlate_investigation(
     "/{investigation_id}/report",
     summary="Generate an investigation report",
     responses={
-        200: {"description": "Report in requested format (JSON or Markdown)"},
-        400: {"model": ErrorResponse, "description": "Invalid format parameter"},
-        404: {"model": ErrorResponse, "description": "Investigation not found"},
+        200: {"description": "Report in requested format"},
+        400: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
     },
 )
 async def get_report(
     investigation_id: str,
     format: str = Query(
         default="json",
-        description="Output format: 'json' (structured) or 'markdown' (human-readable).",
+        description="Output format: 'json' or 'markdown'.",
         pattern="^(json|markdown)$",
     ),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Generate a report for an investigation.
-
-    - **json**: Full structured report as a JSON object. Contains all findings,
-      evidence, relations, timeline and stats. Suitable for programmatic use
-      or downstream processing.
-    - **markdown**: Human-readable Markdown document. Suitable for export,
-      sharing, or rendering in a docs tool.
-
-    The report only reflects data already in the database. Run
-    `POST /correlate` before generating a report if you want relations included.
-    No conclusions are invented — every claim traces back to a Finding.
-    """
     if format not in ("json", "markdown"):
-        raise HTTPException(
-            status_code=400,
-            detail="format must be 'json' or 'markdown'.",
-        )
-
+        raise HTTPException(status_code=400, detail="format must be 'json' or 'markdown'.")
     report_data = await build_report_data(db, investigation_id)
     if report_data is None:
         raise HTTPException(
             status_code=404,
             detail=f"Investigation '{investigation_id}' not found.",
         )
-
     if format == "markdown":
-        md = render_markdown(report_data)
-        return PlainTextResponse(content=md, media_type="text/markdown")
-
+        return PlainTextResponse(content=render_markdown(report_data), media_type="text/markdown")
     return render_json(report_data)
 
 
