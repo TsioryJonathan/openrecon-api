@@ -1,24 +1,38 @@
+import logging
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 
-from app.db.database import Base, engine
 from app.routers import dork, exif, investigation, recon, scan, sherlock
 from app.schemas import MessageResponse
 
 OPENAPI_PATH = Path(__file__).parent.parent / "openapi.yaml"
 
+import sys
+import time
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    stream=sys.stdout,
+    force=True,
+)
+for logger_name in ["uvicorn", "uvicorn.error", "uvicorn.access"]:
+    lg = logging.getLogger(logger_name)
+    lg.setLevel(logging.INFO)
+    lg.propagate = True
+
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        print(Base.metadata.tables.keys())
-        await conn.run_sync(Base.metadata.create_all)
+    logger.info("Application started (migrations disabled)")
     yield
 
 
@@ -37,6 +51,38 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception:
+        duration = (time.perf_counter() - start) * 1000
+        logger.exception(
+            "%s %s FAILED %.1fms",
+            request.method,
+            request.url.path,
+            duration,
+        )
+        raise
+    duration = (time.perf_counter() - start) * 1000
+    logger.info(
+        "%s %s %s %.1fms",
+        request.method,
+        request.url.path,
+        response.status_code,
+        duration,
+    )
+    return response
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
+
 
 app.include_router(sherlock.router, prefix="/api/sherlock", tags=["Sherlock"])
 app.include_router(dork.router, prefix="/api/dork", tags=["Dork"])
