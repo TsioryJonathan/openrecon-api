@@ -9,6 +9,7 @@ from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import JSONResponse, PlainTextResponse
 
 from app.core.auth import get_current_user_id, require_api_key
+from app.db.migrations import run_migrations
 from app.routers import dork, exif, investigation, recon, scan, sherlock
 from app.schemas import MessageResponse
 
@@ -35,7 +36,9 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Application started (migrations disabled)")
+    logger.info("Application starting, running migrations...")
+    await run_migrations()
+    logger.info("Migrations applied. Application started.")
     yield
 
 
