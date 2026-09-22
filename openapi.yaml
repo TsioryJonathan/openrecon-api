@@ -578,6 +578,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/investigations/{investigation_id}/relations:
+    get:
+      tags:
+      - Investigations
+      summary: List all relations for an investigation
+      operationId: get_investigation_relations_api_investigations__investigation_id__relations_get
+      parameters:
+      - name: investigation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Investigation Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvestigationRelationsResponse'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/investigations/{investigation_id}/report:
     get:
       tags:
@@ -1133,6 +1165,24 @@ components:
       - total
       - investigations
       title: InvestigationListResponse
+    InvestigationRelationsResponse:
+      properties:
+        investigation_id:
+          type: string
+          title: Investigation Id
+        relation_count:
+          type: integer
+          title: Relation Count
+        relations:
+          items:
+            $ref: '#/components/schemas/RelationItem'
+          type: array
+          title: Relations
+      type: object
+      required:
+      - investigation_id
+      - relation_count
+      title: InvestigationRelationsResponse
     InvestigationScanRequest:
       properties:
         target_type:
