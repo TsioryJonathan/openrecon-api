@@ -87,7 +87,9 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
 
 
-app.include_router(sherlock.router, prefix="/api/sherlock", tags=["Sherlock"], dependencies=AUTH_DEPS)
+app.include_router(
+    sherlock.router, prefix="/api/sherlock", tags=["Sherlock"], dependencies=AUTH_DEPS
+)
 app.include_router(dork.router, prefix="/api/dork", tags=["Dork"], dependencies=AUTH_DEPS)
 app.include_router(exif.router, prefix="/api/exif", tags=["EXIF"], dependencies=AUTH_DEPS)
 app.include_router(recon.router, prefix="/api/recon", tags=["Recon"], dependencies=AUTH_DEPS)
