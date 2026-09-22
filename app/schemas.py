@@ -208,6 +208,12 @@ class InvestigationScanResponse(BaseModel):
     investigation: InvestigationSummaryResponse
 
 
+class InvestigationTargetFindingsResponse(BaseModel):
+    target_id: str
+    finding_count: int
+    findings: list[ScanFindingItem] = Field(default_factory=list)
+
+
 # ---------------------------------------------------------------------------
 # Correlation
 # ---------------------------------------------------------------------------

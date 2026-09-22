@@ -150,6 +150,41 @@ async def add_target_to_investigation(
     return link
 
 
+async def get_findings_for_target_in_investigation(
+    db: AsyncSession,
+    *,
+    investigation_id: str,
+    target_id: str,
+) -> list[Finding] | None:
+    """
+    Return findings for a target linked to this investigation, with evidence
+    eagerly loaded.
+
+    Returns None if the investigation does not exist or the target is not
+    linked to it.
+    """
+    stmt = (
+        select(InvestigationTarget)
+        .where(
+            InvestigationTarget.investigation_id == investigation_id,
+            InvestigationTarget.target_id == target_id,
+        )
+        .limit(1)
+    )
+    link = (await db.execute(stmt)).scalars().first()
+    if link is None:
+        return None
+
+    f_stmt = (
+        select(Finding)
+        .where(Finding.target_id == target_id)
+        .order_by(Finding.observed_at)
+        .options(selectinload(Finding.evidence))
+    )
+    result = await db.execute(f_stmt)
+    return list(result.scalars().all())
+
+
 # ---------------------------------------------------------------------------
 # Status
 # ---------------------------------------------------------------------------

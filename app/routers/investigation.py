@@ -13,6 +13,7 @@ from app.schemas import (
     InvestigationScanRequest,
     InvestigationScanResponse,
     InvestigationSummaryResponse,
+    InvestigationTargetFindingsResponse,
 )
 from app.services import investigation as inv_service
 from app.services.adaptive import DEFAULT_MAX_DEPTH, run_adaptive_scan
@@ -117,6 +118,61 @@ async def add_target(
         code = 404 if "not found" in str(e) else 400
         raise HTTPException(status_code=code, detail=str(e))
     return await inv_service.get_investigation_summary(db, investigation_id)
+
+
+@router.get(
+    "/{investigation_id}/targets/{target_id}/findings",
+    response_model=InvestigationTargetFindingsResponse,
+    summary="List findings for a target within an investigation",
+    responses={404: {"model": ErrorResponse}},
+)
+async def get_target_findings(
+    investigation_id: str,
+    target_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    findings = await inv_service.get_findings_for_target_in_investigation(
+        db,
+        investigation_id=investigation_id,
+        target_id=target_id,
+    )
+    if findings is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"Target '{target_id}' not found in investigation "
+                f"'{investigation_id}'."
+            ),
+        )
+    findings_out = []
+    for f in findings:
+        evidence_out = [
+            {
+                "id": e.id,
+                "source": e.source,
+                "evidence_type": e.evidence_type,
+                "value": e.value,
+                "observed_at": str(e.observed_at),
+            }
+            for e in (f.evidence if f.evidence else [])
+        ]
+        findings_out.append(
+            {
+                "id": f.id,
+                "type": f.type,
+                "value": f.value,
+                "source": f.source,
+                "confidence": f.confidence,
+                "confidence_reason": f.confidence_reason,
+                "observed_at": str(f.observed_at),
+                "evidence": evidence_out,
+            }
+        )
+    return {
+        "target_id": target_id,
+        "finding_count": len(findings_out),
+        "findings": findings_out,
+    }
 
 
 @router.post(
