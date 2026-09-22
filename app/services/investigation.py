@@ -37,6 +37,7 @@ async def create_investigation(
     *,
     name: str,
     description: str | None = None,
+    owner_id: str | None = None,
 ) -> Investigation:
     """
     Create a new Investigation.
@@ -44,7 +45,7 @@ async def create_investigation(
     The investigation is created with status='open' and no targets.
     Targets are added separately via add_target_to_investigation().
     """
-    inv = Investigation(name=name.strip(), description=description)
+    inv = Investigation(name=name.strip(), description=description, owner_id=owner_id)
     db.add(inv)
     await db.commit()
     await db.refresh(inv)
@@ -60,13 +61,22 @@ async def create_investigation(
 async def get_investigation(
     db: AsyncSession,
     investigation_id: str,
+    *,
+    owner_id: str | None = None,
 ) -> Investigation | None:
-    """Return an Investigation by ID with its InvestigationTarget rows loaded."""
+    """Return an Investigation by ID with its InvestigationTarget rows loaded.
+
+    When owner_id is provided, only investigations owned by that user are
+    returned (None otherwise). When owner_id is None, no ownership filter is
+    applied (degraded/legacy reads).
+    """
     stmt = (
         select(Investigation)
         .where(Investigation.id == investigation_id)
         .options(selectinload(Investigation.targets).selectinload(InvestigationTarget.target))
     )
+    if owner_id is not None:
+        stmt = stmt.where(Investigation.owner_id == owner_id)
     result = await db.execute(stmt)
     return result.scalars().first()
 
@@ -77,15 +87,18 @@ async def list_investigations(
     status: str | None = None,
     limit: int = 50,
     offset: int = 0,
+    owner_id: str | None = None,
 ) -> list[Investigation]:
     """
-    List investigations, optionally filtered by status.
+    List investigations, optionally filtered by status and/or owner.
 
     Returns investigations ordered by created_at descending (most recent first).
     """
     stmt = select(Investigation).order_by(Investigation.created_at.desc())
     if status:
         stmt = stmt.where(Investigation.status == status)
+    if owner_id is not None:
+        stmt = stmt.where(Investigation.owner_id == owner_id)
     stmt = stmt.limit(limit).offset(offset)
     result = await db.execute(stmt)
     return list(result.scalars().all())
@@ -102,19 +115,20 @@ async def add_target_to_investigation(
     investigation_id: str,
     target_id: str,
     role: str | None = None,
+    owner_id: str | None = None,
 ) -> InvestigationTarget:
     """
     Link an existing Target to an Investigation.
 
     Raises ValueError if:
-    - The investigation does not exist.
+    - The investigation does not exist (or is not owned by owner_id).
     - The investigation is closed.
     - The target is already linked to this investigation.
 
     The target must already exist in the DB (created via storage.get_or_create_target).
     """
     # Load investigation
-    inv = await get_investigation(db, investigation_id)
+    inv = await get_investigation(db, investigation_id, owner_id=owner_id)
     if inv is None:
         raise ValueError(f"Investigation '{investigation_id}' not found.")
     if inv.status == "closed":
@@ -155,14 +169,19 @@ async def get_findings_for_target_in_investigation(
     *,
     investigation_id: str,
     target_id: str,
+    owner_id: str | None = None,
 ) -> list[Finding] | None:
     """
     Return findings for a target linked to this investigation, with evidence
     eagerly loaded.
 
-    Returns None if the investigation does not exist or the target is not
-    linked to it.
+    Returns None if the investigation does not exist (or is not owned by
+    owner_id) or the target is not linked to it.
     """
+    link_inv = await get_investigation(db, investigation_id, owner_id=owner_id)
+    if link_inv is None:
+        return None
+
     stmt = (
         select(InvestigationTarget)
         .where(
@@ -193,6 +212,8 @@ async def get_findings_for_target_in_investigation(
 async def close_investigation(
     db: AsyncSession,
     investigation_id: str,
+    *,
+    owner_id: str | None = None,
 ) -> Investigation:
     """
     Mark an investigation as closed.
@@ -200,9 +221,10 @@ async def close_investigation(
     Closed investigations are read-only: no new targets can be added
     and no scans should be run against them.
 
-    Raises ValueError if the investigation does not exist or is already closed.
+    Raises ValueError if the investigation does not exist (or is not owned
+    by owner_id) or is already closed.
     """
-    inv = await get_investigation(db, investigation_id)
+    inv = await get_investigation(db, investigation_id, owner_id=owner_id)
     if inv is None:
         raise ValueError(f"Investigation '{investigation_id}' not found.")
     if inv.status == "closed":
@@ -221,6 +243,8 @@ async def close_investigation(
 async def get_investigation_summary(
     db: AsyncSession,
     investigation_id: str,
+    *,
+    owner_id: str | None = None,
 ) -> dict | None:
     """
     Return a summary dict for an investigation:
@@ -242,10 +266,11 @@ async def get_investigation_summary(
         ]
     }
 
-    Returns None if the investigation does not exist.
+    Returns None if the investigation does not exist (or is not owned by
+    owner_id).
     Counts are computed with aggregate queries to avoid loading all rows.
     """
-    inv = await get_investigation(db, investigation_id)
+    inv = await get_investigation(db, investigation_id, owner_id=owner_id)
     if inv is None:
         return None
 

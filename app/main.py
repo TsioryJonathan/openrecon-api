@@ -8,11 +8,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import JSONResponse, PlainTextResponse
 
-from app.core.auth import validate_api_key
+from app.core.auth import get_current_user_id, require_api_key
 from app.routers import dork, exif, investigation, recon, scan, sherlock
 from app.schemas import MessageResponse
 
-AUTH_DEPS = [Depends(validate_api_key)]
+INVESTIGATION_DEPS = [Depends(require_api_key), Depends(get_current_user_id)]
 
 OPENAPI_PATH = Path(__file__).parent.parent / "openapi.yaml"
 
@@ -87,18 +87,16 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
 
 
-app.include_router(
-    sherlock.router, prefix="/api/sherlock", tags=["Sherlock"], dependencies=AUTH_DEPS
-)
-app.include_router(dork.router, prefix="/api/dork", tags=["Dork"], dependencies=AUTH_DEPS)
-app.include_router(exif.router, prefix="/api/exif", tags=["EXIF"], dependencies=AUTH_DEPS)
-app.include_router(recon.router, prefix="/api/recon", tags=["Recon"], dependencies=AUTH_DEPS)
-app.include_router(scan.router, prefix="/api/scan", tags=["Scan"], dependencies=AUTH_DEPS)
+app.include_router(sherlock.router, prefix="/api/sherlock", tags=["Sherlock"])
+app.include_router(dork.router, prefix="/api/dork", tags=["Dork"])
+app.include_router(exif.router, prefix="/api/exif", tags=["EXIF"])
+app.include_router(recon.router, prefix="/api/recon", tags=["Recon"])
+app.include_router(scan.router, prefix="/api/scan", tags=["Scan"])
 app.include_router(
     investigation.router,
     prefix="/api/investigations",
     tags=["Investigations"],
-    dependencies=AUTH_DEPS,
+    dependencies=INVESTIGATION_DEPS,
 )
 
 

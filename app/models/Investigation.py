@@ -33,6 +33,7 @@ class Investigation(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String, nullable=False)
     description = Column(Text, nullable=True)
+    owner_id = Column(String, nullable=True)
     status = Column(String, nullable=False, default="open")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(

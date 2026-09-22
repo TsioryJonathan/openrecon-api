@@ -96,6 +96,7 @@ async def run_adaptive_scan(
     rate_limiter: RateLimiter | None = None,
     max_depth: int = DEFAULT_MAX_DEPTH,
     investigation_id: str | None = None,
+    owner_id: str | None = None,
 ) -> AdaptiveResult:
     """
     Run an adaptive recon scan starting from a single target.
@@ -121,6 +122,7 @@ async def run_adaptive_scan(
         max_depth: maximum number of hops beyond the initial scan (default 2).
         investigation_id: if set, each scanned target is linked to this
             investigation via add_target_to_investigation (idempotent).
+        owner_id: ownership scope passed through to investigation services.
     """
     scope = scope or UNRESTRICTED
     rate_limiter = rate_limiter or get_rate_limiter()
@@ -223,6 +225,7 @@ async def run_adaptive_scan(
                     investigation_id=investigation_id,
                     target_id=scan_result.target.id,
                     role=role,
+                    owner_id=owner_id,
                 )
             except ValueError as e:
                 if "already linked" not in str(e):

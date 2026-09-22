@@ -20,20 +20,36 @@ uv run uvicorn app.main:app --port 10000
 
 ### Environment
 
-| Variable        | Required | Default | Description |
-|-----------------|----------|---------|-------------|
-| `DATABASE_URL`  | yes      | -       | Async Postgres URL (`postgresql+asyncpg://...`) |
-| `CORS_ORIGINS`  | no       | none    | Comma-separated allowed origins |
-| `API_KEY`       | no       | none    | When set, all `/api/*` routes require the `X-API-Key` header |
-| `PORT`          | no       | 10000   | Server port |
+| Variable              | Required | Default | Description |
+|-----------------------|----------|---------|-------------|
+| `DATABASE_URL`        | yes      | -       | Async Postgres URL (`postgresql+asyncpg://...`) |
+| `CORS_ORIGINS`        | no       | none    | Comma-separated allowed origins |
+| `API_KEY`             | yes (prod) | none    | Required by `/api/investigations/*`; 503 if unset |
+| `AUTH_ALLOW_DEGRADED` | no       | false   | When `true`, skips the `X-User-Id` check (local dev only) |
+| `PORT`                | no       | 10000   | Server port |
 
-`CORS_ORIGINS` and `API_KEY` must be set in the Render dashboard for the public deployment.
+`CORS_ORIGINS`, `API_KEY` and `AUTH_ALLOW_DEGRADED` must be set in the Render dashboard for the public deployment.
 
 ### Auth
 
-Set `API_KEY=secret-value` on the server. Every `/api/*` request must then send
-`X-API-Key: secret-value`. Health check (`GET /`), `/openapi.yaml` and
-`/docs` stay public. When `API_KEY` is unset the API is open.
+Two layers protect `/api/investigations/*` (both required):
+
+1. **API key** : the `X-API-Key` header must match `API_KEY`. If `API_KEY`
+   is unset → `503 API_KEY not configured` (fail-closed, never "open").
+2. **User isolation** : the `X-User-Id` header must carry the authenticated
+   user id (injected server-to-server by the OpenRecon UI proxy, never
+   exposed to the browser). When absent → `401 Unauthorized`, unless
+   `AUTH_ALLOW_DEGRADED=true` (local development only).
+
+All `/api/investigations/*` routes scope every query by `X-User-Id` :
+an investigation owned by another user is treated as non-existent (`404`),
+so existence cannot be probed. Legacy rows with `owner_id = NULL` are
+invisible to authenticated requests.
+
+The standalone modules (`/api/sherlock`, `/api/dork`, `/api/exif`,
+`/api/recon`, `/api/scan`) are **public** (no auth).
+
+The health check (`GET /`), `/openapi.yaml` and `/docs` stay public.
 
 ## Deployment
 

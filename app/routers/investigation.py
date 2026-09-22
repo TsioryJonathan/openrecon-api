@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import get_current_user_id
 from app.db.database import get_db
 from app.schemas import (
     AdaptiveScanResponse,
@@ -38,9 +39,14 @@ router = APIRouter()
 async def create_investigation(
     body: InvestigationCreateRequest,
     db: AsyncSession = Depends(get_db),
+    owner_id: str | None = Depends(get_current_user_id),
 ):
-    inv = await inv_service.create_investigation(db, name=body.name, description=body.description)
-    return await inv_service.get_investigation_summary(db, inv.id)
+    inv = await inv_service.create_investigation(
+        db, name=body.name, description=body.description, owner_id=owner_id
+    )
+    return await inv_service.get_investigation_summary(
+        db, inv.id, owner_id=owner_id
+    )
 
 
 @router.get(
@@ -53,13 +59,14 @@ async def list_investigations(
     limit: int = 50,
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
+    owner_id: str | None = Depends(get_current_user_id),
 ):
     if status and status not in ("open", "closed"):
         raise HTTPException(status_code=400, detail="status must be 'open' or 'closed'.")
     if limit < 1 or limit > 200:
         raise HTTPException(status_code=400, detail="limit must be between 1 and 200.")
     investigations = await inv_service.list_investigations(
-        db, status=status, limit=limit, offset=offset
+        db, status=status, limit=limit, offset=offset, owner_id=owner_id
     )
     return {
         "total": len(investigations),
@@ -86,8 +93,11 @@ async def list_investigations(
 async def get_investigation(
     investigation_id: str,
     db: AsyncSession = Depends(get_db),
+    owner_id: str | None = Depends(get_current_user_id),
 ):
-    summary = await inv_service.get_investigation_summary(db, investigation_id)
+    summary = await inv_service.get_investigation_summary(
+        db, investigation_id, owner_id=owner_id
+    )
     if summary is None:
         raise HTTPException(
             status_code=404,
@@ -107,6 +117,7 @@ async def add_target(
     investigation_id: str,
     body: InvestigationAddTargetRequest,
     db: AsyncSession = Depends(get_db),
+    owner_id: str | None = Depends(get_current_user_id),
 ):
     target, _ = await get_or_create_target(
         db, type=body.target_type, value=body.target_value.strip()
@@ -117,11 +128,14 @@ async def add_target(
             investigation_id=investigation_id,
             target_id=target.id,
             role=body.role,
+            owner_id=owner_id,
         )
     except ValueError as e:
         code = 404 if "not found" in str(e) else 400
         raise HTTPException(status_code=code, detail=str(e))
-    return await inv_service.get_investigation_summary(db, investigation_id)
+    return await inv_service.get_investigation_summary(
+        db, investigation_id, owner_id=owner_id
+    )
 
 
 @router.get(
@@ -134,11 +148,13 @@ async def get_target_findings(
     investigation_id: str,
     target_id: str,
     db: AsyncSession = Depends(get_db),
+    owner_id: str | None = Depends(get_current_user_id),
 ):
     findings = await inv_service.get_findings_for_target_in_investigation(
         db,
         investigation_id=investigation_id,
         target_id=target_id,
+        owner_id=owner_id,
     )
     if findings is None:
         raise HTTPException(
@@ -190,6 +206,7 @@ async def scan_within_investigation(
     investigation_id: str,
     body: InvestigationScanRequest,
     db: AsyncSession = Depends(get_db),
+    owner_id: str | None = Depends(get_current_user_id),
 ):
     if body.target_type not in SUPPORTED_TARGET_TYPES:
         raise HTTPException(
@@ -207,6 +224,7 @@ async def scan_within_investigation(
             target_value=body.target_value.strip(),
             options=body.options,
             role=body.role,
+            owner_id=owner_id,
         )
     except ValueError as e:
         code = 404 if "not found" in str(e) else 400
@@ -251,7 +269,9 @@ async def scan_within_investigation(
             "findings": findings_out,
             "errors": scan_result.errors,
         },
-        "investigation": await inv_service.get_investigation_summary(db, investigation_id),
+        "investigation": await inv_service.get_investigation_summary(
+            db, investigation_id, owner_id=owner_id
+        ),
     }
 
 
@@ -279,6 +299,7 @@ async def adaptive_scan_within_investigation(
         ),
     ),
     db: AsyncSession = Depends(get_db),
+    owner_id: str | None = Depends(get_current_user_id),
 ):
     """
     Run an adaptive recon scan starting from a single target.
@@ -305,7 +326,7 @@ async def adaptive_scan_within_investigation(
             ),
         )
 
-    inv = await inv_service.get_investigation(db, investigation_id)
+    inv = await inv_service.get_investigation(db, investigation_id, owner_id=owner_id)
     if inv is None:
         raise HTTPException(
             status_code=404,
@@ -324,6 +345,7 @@ async def adaptive_scan_within_investigation(
         options=body.options,
         max_depth=max_depth,
         investigation_id=investigation_id,
+        owner_id=owner_id,
     )
 
     hops_out = []
@@ -369,7 +391,9 @@ async def adaptive_scan_within_investigation(
         "hops": hops_out,
         "leads_skipped": adaptive_result.leads_skipped,
         "errors": adaptive_result.errors,
-        "investigation": await inv_service.get_investigation_summary(db, investigation_id),
+        "investigation": await inv_service.get_investigation_summary(
+            db, investigation_id, owner_id=owner_id
+        ),
     }
 
 
@@ -382,8 +406,9 @@ async def adaptive_scan_within_investigation(
 async def correlate_investigation(
     investigation_id: str,
     db: AsyncSession = Depends(get_db),
+    owner_id: str | None = Depends(get_current_user_id),
 ):
-    inv = await inv_service.get_investigation(db, investigation_id)
+    inv = await inv_service.get_investigation(db, investigation_id, owner_id=owner_id)
     if inv is None:
         raise HTTPException(
             status_code=404,
@@ -419,8 +444,9 @@ async def correlate_investigation(
 async def get_investigation_relations(
     investigation_id: str,
     db: AsyncSession = Depends(get_db),
+    owner_id: str | None = Depends(get_current_user_id),
 ):
-    inv = await inv_service.get_investigation(db, investigation_id)
+    inv = await inv_service.get_investigation(db, investigation_id, owner_id=owner_id)
     if inv is None:
         raise HTTPException(
             status_code=404,
@@ -462,9 +488,16 @@ async def get_report(
         pattern="^(json|markdown)$",
     ),
     db: AsyncSession = Depends(get_db),
+    owner_id: str | None = Depends(get_current_user_id),
 ):
     if format not in ("json", "markdown"):
         raise HTTPException(status_code=400, detail="format must be 'json' or 'markdown'.")
+    inv = await inv_service.get_investigation(db, investigation_id, owner_id=owner_id)
+    if inv is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Investigation '{investigation_id}' not found.",
+        )
     report_data = await build_report_data(db, investigation_id)
     if report_data is None:
         raise HTTPException(
@@ -485,10 +518,13 @@ async def get_report(
 async def close_investigation(
     investigation_id: str,
     db: AsyncSession = Depends(get_db),
+    owner_id: str | None = Depends(get_current_user_id),
 ):
     try:
-        await inv_service.close_investigation(db, investigation_id)
+        await inv_service.close_investigation(db, investigation_id, owner_id=owner_id)
     except ValueError as e:
         code = 404 if "not found" in str(e) else 400
         raise HTTPException(status_code=code, detail=str(e))
-    return await inv_service.get_investigation_summary(db, investigation_id)
+    return await inv_service.get_investigation_summary(
+        db, investigation_id, owner_id=owner_id
+    )

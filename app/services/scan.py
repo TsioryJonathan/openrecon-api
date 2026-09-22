@@ -245,17 +245,19 @@ async def run_scan_for_investigation(
     role: str | None = None,
     scope: Scope | None = None,
     rate_limiter: RateLimiter | None = None,
+    owner_id: str | None = None,
 ) -> ScanResult:
     """
     Run a scan and automatically link the target to an investigation.
 
-    Validates investigation exists and is open, then delegates to run_scan().
-    Links target to investigation after scan (idempotent).
+    Validates investigation exists (and is owned by owner_id) and is open,
+    then delegates to run_scan(). Links target to investigation after scan
+    (idempotent).
 
     Raises ValueError if investigation not found or closed.
     Scope violations and rate limit hits are returned in ScanResult, not raised.
     """
-    inv = await inv_service.get_investigation(db, investigation_id)
+    inv = await inv_service.get_investigation(db, investigation_id, owner_id=owner_id)
     if inv is None:
         raise ValueError(f"Investigation '{investigation_id}' not found.")
     if inv.status == "closed":
@@ -278,6 +280,7 @@ async def run_scan_for_investigation(
             investigation_id=investigation_id,
             target_id=scan_result.target.id,
             role=role,
+            owner_id=owner_id,
         )
     except ValueError as e:
         if "already linked" in str(e):
