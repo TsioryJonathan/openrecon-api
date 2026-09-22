@@ -44,9 +44,7 @@ async def create_investigation(
     inv = await inv_service.create_investigation(
         db, name=body.name, description=body.description, owner_id=owner_id
     )
-    return await inv_service.get_investigation_summary(
-        db, inv.id, owner_id=owner_id
-    )
+    return await inv_service.get_investigation_summary(db, inv.id, owner_id=owner_id)
 
 
 @router.get(
@@ -95,9 +93,7 @@ async def get_investigation(
     db: AsyncSession = Depends(get_db),
     owner_id: str | None = Depends(get_current_user_id),
 ):
-    summary = await inv_service.get_investigation_summary(
-        db, investigation_id, owner_id=owner_id
-    )
+    summary = await inv_service.get_investigation_summary(db, investigation_id, owner_id=owner_id)
     if summary is None:
         raise HTTPException(
             status_code=404,
@@ -133,9 +129,7 @@ async def add_target(
     except ValueError as e:
         code = 404 if "not found" in str(e) else 400
         raise HTTPException(status_code=code, detail=str(e))
-    return await inv_service.get_investigation_summary(
-        db, investigation_id, owner_id=owner_id
-    )
+    return await inv_service.get_investigation_summary(db, investigation_id, owner_id=owner_id)
 
 
 @router.get(
@@ -525,6 +519,4 @@ async def close_investigation(
     except ValueError as e:
         code = 404 if "not found" in str(e) else 400
         raise HTTPException(status_code=code, detail=str(e))
-    return await inv_service.get_investigation_summary(
-        db, investigation_id, owner_id=owner_id
-    )
+    return await inv_service.get_investigation_summary(db, investigation_id, owner_id=owner_id)
