@@ -20,9 +20,19 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    op.add_column("findings", sa.Column("normalized_value", sa.String(), nullable=True))
+    # Idempotent: the initial schema (332d793e375d) already defines
+    # normalized_value. Only add it if this DB predates that column.
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    columns = {c["name"] for c in inspector.get_columns("findings")}
+    if "normalized_value" not in columns:
+        op.add_column("findings", sa.Column("normalized_value", sa.String(), nullable=True))
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.drop_column("findings", "normalized_value")
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    columns = {c["name"] for c in inspector.get_columns("findings")}
+    if "normalized_value" in columns:
+        op.drop_column("findings", "normalized_value")
