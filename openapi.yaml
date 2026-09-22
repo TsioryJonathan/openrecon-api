@@ -20,6 +20,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SitesResponse'
+      security:
+      - APIKeyHeader: []
   /api/sherlock/search:
     post:
       tags:
@@ -54,6 +56,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - APIKeyHeader: []
   /api/sherlock/results:
     get:
       tags:
@@ -62,6 +66,8 @@ paths:
       description: Returns the history of all searches performed for a given username.
         Each search includes the list of results found.
       operationId: get_results_api_sherlock_results_get
+      security:
+      - APIKeyHeader: []
       parameters:
       - name: username
         in: query
@@ -119,6 +125,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - APIKeyHeader: []
   /api/exif/extract:
     post:
       tags:
@@ -152,6 +160,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - APIKeyHeader: []
   /api/recon:
     get:
       tags:
@@ -161,6 +171,8 @@ paths:
         geolocation, ISP, ASN, and proxy status. For a domain, returns registrar,
         creation/expiry dates, nameservers, DNS records, and subdomains.
       operationId: get_recon_api_recon_get
+      security:
+      - APIKeyHeader: []
       parameters:
       - name: query
         in: query
@@ -241,12 +253,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - APIKeyHeader: []
   /api/investigations:
     post:
       tags:
       - Investigations
       summary: Create a new investigation
       operationId: create_investigation_api_investigations_post
+      security:
+      - APIKeyHeader: []
       requestBody:
         required: true
         content:
@@ -271,6 +287,8 @@ paths:
       - Investigations
       summary: List investigations
       operationId: list_investigations_api_investigations_get
+      security:
+      - APIKeyHeader: []
       parameters:
       - name: status
         in: query
@@ -313,6 +331,8 @@ paths:
       - Investigations
       summary: Get investigation summary
       operationId: get_investigation_api_investigations__investigation_id__get
+      security:
+      - APIKeyHeader: []
       parameters:
       - name: investigation_id
         in: path
@@ -345,6 +365,8 @@ paths:
       - Investigations
       summary: Add a target to an investigation
       operationId: add_target_api_investigations__investigation_id__targets_post
+      security:
+      - APIKeyHeader: []
       parameters:
       - name: investigation_id
         in: path
@@ -389,6 +411,8 @@ paths:
       - Investigations
       summary: List findings for a target within an investigation
       operationId: get_target_findings_api_investigations__investigation_id__targets__target_id__findings_get
+      security:
+      - APIKeyHeader: []
       parameters:
       - name: investigation_id
         in: path
@@ -427,6 +451,8 @@ paths:
       - Investigations
       summary: Run a scan within an investigation
       operationId: scan_within_investigation_api_investigations__investigation_id__scan_post
+      security:
+      - APIKeyHeader: []
       parameters:
       - name: investigation_id
         in: path
@@ -495,6 +521,8 @@ paths:
 
         Returns a summary of all hops, findings, leads extracted/skipped.'
       operationId: adaptive_scan_within_investigation_api_investigations__investigation_id__adaptive_scan_post
+      security:
+      - APIKeyHeader: []
       parameters:
       - name: investigation_id
         in: path
@@ -552,6 +580,8 @@ paths:
       - Investigations
       summary: Run correlation across all targets in an investigation
       operationId: correlate_investigation_api_investigations__investigation_id__correlate_post
+      security:
+      - APIKeyHeader: []
       parameters:
       - name: investigation_id
         in: path
@@ -584,6 +614,8 @@ paths:
       - Investigations
       summary: List all relations for an investigation
       operationId: get_investigation_relations_api_investigations__investigation_id__relations_get
+      security:
+      - APIKeyHeader: []
       parameters:
       - name: investigation_id
         in: path
@@ -616,6 +648,8 @@ paths:
       - Investigations
       summary: Generate an investigation report
       operationId: get_report_api_investigations__investigation_id__report_get
+      security:
+      - APIKeyHeader: []
       parameters:
       - name: investigation_id
         in: path
@@ -663,6 +697,8 @@ paths:
       - Investigations
       summary: Close an investigation
       operationId: close_investigation_api_investigations__investigation_id__close_post
+      security:
+      - APIKeyHeader: []
       parameters:
       - name: investigation_id
         in: path
@@ -1642,3 +1678,8 @@ components:
       - msg
       - type
       title: ValidationError
+  securitySchemes:
+    APIKeyHeader:
+      type: apiKey
+      in: header
+      name: X-API-Key
