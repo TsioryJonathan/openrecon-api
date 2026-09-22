@@ -10,6 +10,7 @@ from app.schemas import (
     InvestigationAddTargetRequest,
     InvestigationCreateRequest,
     InvestigationListResponse,
+    InvestigationRelationsResponse,
     InvestigationScanRequest,
     InvestigationScanResponse,
     InvestigationSummaryResponse,
@@ -17,7 +18,10 @@ from app.schemas import (
 )
 from app.services import investigation as inv_service
 from app.services.adaptive import DEFAULT_MAX_DEPTH, run_adaptive_scan
-from app.services.correlation import run_correlation_for_investigation
+from app.services.correlation import (
+    get_relations_for_investigation,
+    run_correlation_for_investigation,
+)
 from app.services.report import build_report_data, render_json, render_markdown
 from app.services.scan import SUPPORTED_TARGET_TYPES, run_scan_for_investigation
 from app.services.storage import get_or_create_target
@@ -139,10 +143,7 @@ async def get_target_findings(
     if findings is None:
         raise HTTPException(
             status_code=404,
-            detail=(
-                f"Target '{target_id}' not found in investigation "
-                f"'{investigation_id}'."
-            ),
+            detail=(f"Target '{target_id}' not found in investigation '{investigation_id}'."),
         )
     findings_out = []
     for f in findings:
@@ -405,6 +406,41 @@ async def correlate_investigation(
                 "created_at": str(r.created_at),
             }
             for r in result.relations_created
+        ],
+    }
+
+
+@router.get(
+    "/{investigation_id}/relations",
+    response_model=InvestigationRelationsResponse,
+    summary="List all relations for an investigation",
+    responses={404: {"model": ErrorResponse}},
+)
+async def get_investigation_relations(
+    investigation_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    inv = await inv_service.get_investigation(db, investigation_id)
+    if inv is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Investigation '{investigation_id}' not found.",
+        )
+    relations = await get_relations_for_investigation(db, investigation_id)
+    return {
+        "investigation_id": investigation_id,
+        "relation_count": len(relations),
+        "relations": [
+            {
+                "id": r.id,
+                "source_finding_id": r.source_finding_id,
+                "target_finding_id": r.target_finding_id,
+                "relation_type": r.relation_type,
+                "confidence": r.confidence,
+                "reason": r.reason,
+                "created_at": str(r.created_at),
+            }
+            for r in relations
         ],
     }
 

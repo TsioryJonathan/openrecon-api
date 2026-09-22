@@ -237,6 +237,12 @@ class CorrelationResponse(BaseModel):
     relations: list[RelationItem] = Field(default_factory=list)
 
 
+class InvestigationRelationsResponse(BaseModel):
+    investigation_id: str
+    relation_count: int
+    relations: list[RelationItem] = Field(default_factory=list)
+
+
 # ---------------------------------------------------------------------------
 # Report
 # ---------------------------------------------------------------------------

@@ -297,3 +297,50 @@ async def get_relations_for_target(
             seen.add(r.id)
             combined.append(r)
     return combined
+
+
+async def get_relations_for_investigation(
+    db: AsyncSession,
+    investigation_id: str,
+) -> list[Relation]:
+    """
+    Return all Relations where either the source or target Finding belongs
+    to a target in the investigation.
+
+    Order: by relation_type, then created_at.
+    """
+    from app.models.InvestigationTarget import InvestigationTarget
+
+    link_stmt = select(InvestigationTarget).where(
+        InvestigationTarget.investigation_id == investigation_id
+    )
+    links = (await db.execute(link_stmt)).scalars().all()
+
+    if not links:
+        return []
+
+    finding_stmt = select(Finding.id).where(
+        Finding.target_id.in_([link.target_id for link in links])
+    )
+    finding_ids = set((await db.execute(finding_stmt)).scalars().all())
+
+    if not finding_ids:
+        return []
+
+    rel_stmt = (
+        select(Relation)
+        .where(
+            Relation.source_finding_id.in_(finding_ids)
+            | Relation.target_finding_id.in_(finding_ids)
+        )
+        .order_by(Relation.relation_type, Relation.created_at)
+    )
+    rels = (await db.execute(rel_stmt)).scalars().all()
+
+    seen: set[str] = set()
+    combined: list[Relation] = []
+    for r in rels:
+        if r.id not in seen:
+            seen.add(r.id)
+            combined.append(r)
+    return combined
