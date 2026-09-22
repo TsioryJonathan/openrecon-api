@@ -383,6 +383,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/investigations/{investigation_id}/targets/{target_id}/findings:
+    get:
+      tags:
+      - Investigations
+      summary: List findings for a target within an investigation
+      operationId: get_target_findings_api_investigations__investigation_id__targets__target_id__findings_get
+      parameters:
+      - name: investigation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Investigation Id
+      - name: target_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Target Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvestigationTargetFindingsResponse'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/investigations/{investigation_id}/scan:
     post:
       tags:
@@ -1188,6 +1226,24 @@ components:
       - finding_count
       - evidence_count
       title: InvestigationSummaryResponse
+    InvestigationTargetFindingsResponse:
+      properties:
+        target_id:
+          type: string
+          title: Target Id
+        finding_count:
+          type: integer
+          title: Finding Count
+        findings:
+          items:
+            $ref: '#/components/schemas/ScanFindingItem'
+          type: array
+          title: Findings
+      type: object
+      required:
+      - target_id
+      - finding_count
+      title: InvestigationTargetFindingsResponse
     InvestigationTargetItem:
       properties:
         id:
