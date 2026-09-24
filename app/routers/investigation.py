@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import PlainTextResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import get_current_user_id
 from app.db.database import get_db
+from app.models.Finding import Finding
 from app.schemas import (
     AdaptiveScanResponse,
     CorrelationResponse,
@@ -20,6 +22,7 @@ from app.schemas import (
 from app.services import investigation as inv_service
 from app.services.adaptive import DEFAULT_MAX_DEPTH, run_adaptive_scan
 from app.services.correlation import (
+    build_relation_items,
     get_relations_for_investigation,
     run_correlation_for_investigation,
 )
@@ -447,21 +450,29 @@ async def get_investigation_relations(
             detail=f"Investigation '{investigation_id}' not found.",
         )
     relations = await get_relations_for_investigation(db, investigation_id)
+
+    if not relations:
+        return {
+            "investigation_id": investigation_id,
+            "relation_count": 0,
+            "relations": [],
+        }
+
+    # Enrich each relation with the source/target Finding details so the UI
+    # can render the graph without N+1 finding lookups. Pure serializer:
+    # see build_relation_items in app/services/correlation.py.
+    finding_ids = {r.source_finding_id for r in relations} | {
+        r.target_finding_id for r in relations
+    }
+    finding_stmt = select(Finding).where(Finding.id.in_(finding_ids))
+    findings = (await db.execute(finding_stmt)).scalars().all()
+    findings_by_id = {f.id: f for f in findings}
+    items = build_relation_items(relations, findings_by_id)
+
     return {
         "investigation_id": investigation_id,
         "relation_count": len(relations),
-        "relations": [
-            {
-                "id": r.id,
-                "source_finding_id": r.source_finding_id,
-                "target_finding_id": r.target_finding_id,
-                "relation_type": r.relation_type,
-                "confidence": r.confidence,
-                "reason": r.reason,
-                "created_at": str(r.created_at),
-            }
-            for r in relations
-        ],
+        "relations": items,
     }
 
 

@@ -228,6 +228,16 @@ class RelationItem(BaseModel):
     reason: str
     created_at: str
 
+    # Enriched (optional) finding details for the graph. Set by
+    # `build_relation_items` in app/services/correlation.py. `None` when the
+    # referenced finding is missing (orphaned data).
+    source_finding_type: str | None = None
+    source_finding_value: str | None = None
+    source_finding_target_id: str | None = None
+    target_finding_type: str | None = None
+    target_finding_value: str | None = None
+    target_finding_target_id: str | None = None
+
 
 class CorrelationResponse(BaseModel):
     investigation_id: str

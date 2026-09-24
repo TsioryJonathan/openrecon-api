@@ -344,3 +344,44 @@ async def get_relations_for_investigation(
             seen.add(r.id)
             combined.append(r)
     return combined
+
+
+def build_relation_items(
+    relations: list[Relation],
+    findings_by_id: dict[str, Finding],
+) -> list[dict]:
+    """
+    Pure function: enrich each Relation with the source/target Finding details.
+
+    This is the single place that knows how a Relation is serialized for the
+    UI graph. Keeping it pure lets us unit-test it with stdlib `unittest`
+    (no DB session, no sqlalchemy) — see `tests/test_relations_serialization.py`.
+
+    For every relation it returns a dict with the existing fields unchanged,
+    plus the enriched source/target finding metadata. If a finding referenced
+    by the relation is missing from `findings_by_id` (orphaned data), the
+    enriched fields are `None` instead of crashing.
+    """
+    items: list[dict] = []
+    for rel in relations:
+        source = findings_by_id.get(rel.source_finding_id)
+        target = findings_by_id.get(rel.target_finding_id)
+
+        items.append(
+            {
+                "id": rel.id,
+                "source_finding_id": rel.source_finding_id,
+                "target_finding_id": rel.target_finding_id,
+                "relation_type": rel.relation_type,
+                "confidence": rel.confidence,
+                "reason": rel.reason,
+                "created_at": str(rel.created_at),
+                "source_finding_type": source.type if source else None,
+                "source_finding_value": source.value if source else None,
+                "source_finding_target_id": source.target_id if source else None,
+                "target_finding_type": target.type if target else None,
+                "target_finding_value": target.value if target else None,
+                "target_finding_target_id": target.target_id if target else None,
+            }
+        )
+    return items
