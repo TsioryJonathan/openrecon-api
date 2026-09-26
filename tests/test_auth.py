@@ -13,6 +13,7 @@ import asyncio
 import hashlib
 import hmac
 import time
+from typing import TypedDict
 
 import pytest
 from fastapi import HTTPException, Request
@@ -24,7 +25,15 @@ from app.core.auth import (
     verify_identity_assertion,
 )
 
-VECTOR = {
+
+class _Vector(TypedDict):
+    secret: str
+    user_id: str
+    exp: int
+    sig: str
+
+
+VECTOR: _Vector = {
     "secret": "openrecon-test-secret",
     "user_id": "user_abc123",
     "exp": 1790000000,

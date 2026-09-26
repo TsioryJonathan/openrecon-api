@@ -1,11 +1,17 @@
 import uuid
+from datetime import datetime
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Column, DateTime, ForeignKey, Index, String, func
+from sqlalchemy import DateTime, ForeignKey, Index, String, func
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.confidence import Confidence
 from app.db.database import Base
+
+if TYPE_CHECKING:
+    from app.models.Evidence import Evidence
+    from app.models.Target import Target
 
 
 class Finding(Base):
@@ -43,19 +49,21 @@ class Finding(Base):
         Index("ix_findings_dedup", "target_id", "type", "normalized_value"),
     )
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    type = Column(String, nullable=False)
-    value = Column(String, nullable=False)
-    normalized_value = Column(String, nullable=False)
-    source = Column(String, nullable=False)
-    confidence = Column(String, nullable=False, default=Confidence.POSSIBLE)
-    confidence_reason = Column(String, nullable=False)
-    observed_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    target_id = Column(String, ForeignKey("targets.id"), nullable=False)
-    meta = Column("metadata", JSONB, nullable=True)
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    type: Mapped[str] = mapped_column(String, nullable=False)
+    value: Mapped[str] = mapped_column(String, nullable=False)
+    normalized_value: Mapped[str] = mapped_column(String, nullable=False)
+    source: Mapped[str] = mapped_column(String, nullable=False)
+    confidence: Mapped[str] = mapped_column(String, nullable=False, default=Confidence.POSSIBLE)
+    confidence_reason: Mapped[str] = mapped_column(String, nullable=False)
+    observed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    target_id: Mapped[str] = mapped_column(String, ForeignKey("targets.id"), nullable=False)
+    meta: Mapped[dict | None] = mapped_column("metadata", JSONB, nullable=True)
 
-    target = relationship("Target", back_populates="findings")
-    evidence = relationship(
+    target: Mapped[Target] = relationship("Target", back_populates="findings")
+    evidence: Mapped[list[Evidence]] = relationship(
         "Evidence",
         back_populates="finding",
         cascade="all, delete-orphan",

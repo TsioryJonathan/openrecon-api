@@ -14,6 +14,7 @@ Stack : FastAPI, SQLAlchemy (async), PostgreSQL (Neon), alembic, uv.
 
 ```bash
 uv sync
+cp .env.example .env   # then fill in real values
 uv run alembic upgrade head
 uv run uvicorn app.main:app --port 10000
 ```
@@ -79,9 +80,10 @@ Interactive docs at `/docs`. Live spec at `openapi.yaml` (auto-regenerated).
 ```bash
 uv run pytest          # unit tests (hermetic, no database required)
 uv run ruff check app/ tests/
+uv run mypy app tests  # type checking
 ```
 
-CI runs both on every push/PR to `dev` and `main`.
+CI runs all three on every push/PR to `dev` and `main`.
 
 ## License
 

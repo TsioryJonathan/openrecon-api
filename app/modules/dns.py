@@ -86,9 +86,7 @@ class DNSModule(BaseModule):
         dns_results, crt_results = await asyncio.gather(dns_task, crt_task, return_exceptions=True)
 
         # --- DNS records ---
-        if isinstance(dns_results, Exception):
-            errors.append(f"DNS queries failed: {dns_results}")
-        else:
+        if isinstance(dns_results, dict):
             raw["dns"] = dns_results
             for rtype, records in dns_results.items():
                 for record_data in records:
@@ -96,16 +94,18 @@ class DNSModule(BaseModule):
                     f, e = self._make_dns_record_finding(domain, rtype, record_data, value)
                     findings.append(f)
                     evidence.append(e)
+        else:
+            errors.append(f"DNS queries failed: {dns_results}")
 
         # --- Subdomains from crt.sh ---
-        if isinstance(crt_results, Exception):
-            errors.append(f"crt.sh query failed: {crt_results}")
-        else:
+        if isinstance(crt_results, list):
             raw["crt_sh"] = crt_results
             for subdomain in crt_results:
                 f, e = self._make_subdomain_finding(domain, subdomain)
                 findings.append(f)
                 evidence.append(e)
+        else:
+            errors.append(f"crt.sh query failed: {crt_results}")
 
         return ModuleResult(
             findings=findings,

@@ -1,10 +1,15 @@
 import uuid
+from datetime import datetime
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Column, DateTime, ForeignKey, String, func
+from sqlalchemy import DateTime, ForeignKey, String, func
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
+
+if TYPE_CHECKING:
+    from app.models.Finding import Finding
 
 
 class Evidence(Base):
@@ -30,12 +35,14 @@ class Evidence(Base):
 
     __tablename__ = "evidence"
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    finding_id = Column(String, ForeignKey("findings.id"), nullable=False)
-    source = Column(String, nullable=False)
-    evidence_type = Column(String, nullable=False)
-    value = Column(String, nullable=False)
-    observed_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    meta = Column("metadata", JSONB, nullable=True)
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    finding_id: Mapped[str] = mapped_column(String, ForeignKey("findings.id"), nullable=False)
+    source: Mapped[str] = mapped_column(String, nullable=False)
+    evidence_type: Mapped[str] = mapped_column(String, nullable=False)
+    value: Mapped[str] = mapped_column(String, nullable=False)
+    observed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    meta: Mapped[dict | None] = mapped_column("metadata", JSONB, nullable=True)
 
-    finding = relationship("Finding", back_populates="evidence")
+    finding: Mapped[Finding] = relationship("Finding", back_populates="evidence")

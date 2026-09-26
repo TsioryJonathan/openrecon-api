@@ -39,7 +39,7 @@ from app.models.Finding import Finding
 logger = logging.getLogger(__name__)
 
 # Confidence upgrade ladder — higher index = higher confidence.
-_CONFIDENCE_RANK = {
+_CONFIDENCE_RANK: dict[str, int] = {
     Confidence.POSSIBLE: 0,
     Confidence.LIKELY: 1,
     Confidence.CONFIRMED: 2,

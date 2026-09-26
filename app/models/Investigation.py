@@ -1,9 +1,14 @@
 import uuid
+from datetime import datetime
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Column, DateTime, String, Text, func
-from sqlalchemy.orm import relationship
+from sqlalchemy import DateTime, String, Text, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
+
+if TYPE_CHECKING:
+    from app.models.InvestigationTarget import InvestigationTarget
 
 
 class Investigation(Base):
@@ -30,13 +35,15 @@ class Investigation(Base):
 
     __tablename__ = "investigations"
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    name = Column(String, nullable=False)
-    description = Column(Text, nullable=True)
-    owner_id = Column(String, nullable=True)
-    status = Column(String, nullable=False, default="open")
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    owner_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="open")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
         onupdate=func.now(),
@@ -44,7 +51,7 @@ class Investigation(Base):
     )
 
     # many-to-many via InvestigationTarget join table
-    targets = relationship(
+    targets: Mapped[list[InvestigationTarget]] = relationship(
         "InvestigationTarget",
         back_populates="investigation",
         cascade="all, delete-orphan",

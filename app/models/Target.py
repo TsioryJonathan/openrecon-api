@@ -1,10 +1,15 @@
 import uuid
+from datetime import datetime
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Column, DateTime, String, func
+from sqlalchemy import DateTime, String, func
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
+
+if TYPE_CHECKING:
+    from app.models.Finding import Finding
 
 
 class Target(Base):
@@ -24,13 +29,15 @@ class Target(Base):
 
     __tablename__ = "targets"
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    type = Column(String, nullable=False)
-    value = Column(String, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    meta = Column("metadata", JSONB, nullable=True)
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    type: Mapped[str] = mapped_column(String, nullable=False)
+    value: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    meta: Mapped[dict | None] = mapped_column("metadata", JSONB, nullable=True)
 
-    findings = relationship(
+    findings: Mapped[list[Finding]] = relationship(
         "Finding",
         back_populates="target",
         cascade="all, delete-orphan",

@@ -1,6 +1,7 @@
 import asyncio
 import ipaddress
 import re
+from typing import Any, cast
 
 import httpx
 
@@ -118,6 +119,8 @@ async def recon_domain(domain: str) -> dict:
     rdap, subdomains, ns, mx, a, txt, cname = await asyncio.gather(
         rdap_fut, crt_fut, ns_fut, mx_fut, a_fut, txt_fut, cname_fut
     )
+    # gather unifies the mixed dict/list results to a common supertype
+    rdap = cast(dict[str, Any], rdap)
 
     return {
         "registrar": rdap.get("registrar"),

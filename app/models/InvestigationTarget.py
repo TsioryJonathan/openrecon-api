@@ -1,9 +1,15 @@
 import uuid
+from datetime import datetime
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Column, DateTime, ForeignKey, String, func
-from sqlalchemy.orm import relationship
+from sqlalchemy import DateTime, ForeignKey, String, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
+
+if TYPE_CHECKING:
+    from app.models.Investigation import Investigation
+    from app.models.Target import Target
 
 
 class InvestigationTarget(Base):
@@ -22,11 +28,17 @@ class InvestigationTarget(Base):
 
     __tablename__ = "investigation_targets"
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    investigation_id = Column(String, ForeignKey("investigations.id"), nullable=False)
-    target_id = Column(String, ForeignKey("targets.id"), nullable=False)
-    role = Column(String, nullable=True)  # e.g. "initial_target", "pivot"
-    added_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    investigation_id: Mapped[str] = mapped_column(
+        String, ForeignKey("investigations.id"), nullable=False
+    )
+    target_id: Mapped[str] = mapped_column(String, ForeignKey("targets.id"), nullable=False)
+    role: Mapped[str | None] = mapped_column(
+        String, nullable=True
+    )  # e.g. "initial_target", "pivot"
+    added_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
-    investigation = relationship("Investigation", back_populates="targets")
-    target = relationship("Target")
+    investigation: Mapped[Investigation] = relationship("Investigation", back_populates="targets")
+    target: Mapped[Target] = relationship("Target")

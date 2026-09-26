@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from typing import ClassVar
 
 
 @dataclass
@@ -52,9 +53,9 @@ class BaseModule(ABC):
     It must never import from a specific module directly.
     """
 
-    name: str
-    description: str
-    supported_target_types: list[str]
+    name: ClassVar[str]
+    description: ClassVar[str]
+    supported_target_types: ClassVar[list[str]]
 
     def accepts(self, target_type: str) -> bool:
         """Return True if this module can handle the given target type."""

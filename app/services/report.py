@@ -218,14 +218,14 @@ async def build_report_data(
         )
 
     for flist in findings_by_target.values():
-        for f in flist:
-            if f["observed_at"]:
+        for fd in flist:
+            if fd["observed_at"]:
                 timeline.append(
                     {
-                        "timestamp": f["observed_at"],
+                        "timestamp": fd["observed_at"],
                         "event_type": "finding_observed",
-                        "description": f"[{f['type'].upper()}] {f['value']} "
-                        f"(source: {f['source']}, confidence: {f['confidence']})",
+                        "description": f"[{fd['type'].upper()}] {fd['value']} "
+                        f"(source: {fd['source']}, confidence: {fd['confidence']})",
                     }
                 )
 

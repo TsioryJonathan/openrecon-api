@@ -1,10 +1,15 @@
 import uuid
+from datetime import datetime
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Column, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
+
+if TYPE_CHECKING:
+    from app.models.Finding import Finding
 
 
 # Canonical relation types.
@@ -45,14 +50,20 @@ class Relation(Base):
 
     __tablename__ = "relations"
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    source_finding_id = Column(String, ForeignKey("findings.id"), nullable=False)
-    target_finding_id = Column(String, ForeignKey("findings.id"), nullable=False)
-    relation_type = Column(String, nullable=False)
-    confidence = Column(String, nullable=False)
-    reason = Column(Text, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    meta = Column("metadata", JSONB, nullable=True)
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    source_finding_id: Mapped[str] = mapped_column(
+        String, ForeignKey("findings.id"), nullable=False
+    )
+    target_finding_id: Mapped[str] = mapped_column(
+        String, ForeignKey("findings.id"), nullable=False
+    )
+    relation_type: Mapped[str] = mapped_column(String, nullable=False)
+    confidence: Mapped[str] = mapped_column(String, nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    meta: Mapped[dict | None] = mapped_column("metadata", JSONB, nullable=True)
 
-    source_finding = relationship("Finding", foreign_keys=[source_finding_id])
-    target_finding = relationship("Finding", foreign_keys=[target_finding_id])
+    source_finding: Mapped[Finding] = relationship("Finding", foreign_keys=[source_finding_id])
+    target_finding: Mapped[Finding] = relationship("Finding", foreign_keys=[target_finding_id])

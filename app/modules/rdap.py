@@ -99,7 +99,7 @@ class RDAPModule(BaseModule):
         registrar_name = self._extract_registrar(data)
         if registrar_name:
             raw["registrar"] = registrar_name
-            f, e = self._make_finding(
+            f, ev = self._make_finding(
                 ftype="registrar",
                 value=registrar_name,
                 domain=domain,
@@ -112,13 +112,13 @@ class RDAPModule(BaseModule):
                 meta={"domain": domain, "registrar": registrar_name},
             )
             findings.append(f)
-            evidence.append(e)
+            evidence.append(ev)
 
         # --- Nameservers ---
         nameservers = self._extract_nameservers(data)
         raw["nameservers"] = nameservers
         for ns in nameservers:
-            f, e = self._make_finding(
+            f, ev = self._make_finding(
                 ftype="nameserver",
                 value=ns,
                 domain=domain,
@@ -131,13 +131,13 @@ class RDAPModule(BaseModule):
                 meta={"domain": domain, "nameserver": ns},
             )
             findings.append(f)
-            evidence.append(e)
+            evidence.append(ev)
 
         # --- EPP Status codes ---
         statuses = self._extract_statuses(data)
         raw["statuses"] = statuses
         for status in statuses:
-            f, e = self._make_finding(
+            f, ev = self._make_finding(
                 ftype="domain_status",
                 value=status,
                 domain=domain,
@@ -149,13 +149,13 @@ class RDAPModule(BaseModule):
                 meta={"domain": domain, "status": status},
             )
             findings.append(f)
-            evidence.append(e)
+            evidence.append(ev)
 
         # --- Expiry date ---
         expiry = self._extract_expiry(data)
         if expiry:
             raw["expiry"] = expiry
-            f, e = self._make_finding(
+            f, ev = self._make_finding(
                 ftype="expiry_date",
                 value=expiry,
                 domain=domain,
@@ -168,7 +168,7 @@ class RDAPModule(BaseModule):
                 meta={"domain": domain, "expiry": expiry},
             )
             findings.append(f)
-            evidence.append(e)
+            evidence.append(ev)
 
         return ModuleResult(
             findings=findings,
