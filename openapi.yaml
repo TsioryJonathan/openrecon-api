@@ -1375,6 +1375,36 @@ components:
         created_at:
           type: string
           title: Created At
+        source_finding_type:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Source Finding Type
+        source_finding_value:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Source Finding Value
+        source_finding_target_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Source Finding Target Id
+        target_finding_type:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Target Finding Type
+        target_finding_value:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Target Finding Value
+        target_finding_target_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Target Finding Target Id
       type: object
       required:
       - id
