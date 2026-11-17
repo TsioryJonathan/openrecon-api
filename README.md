@@ -1,5 +1,7 @@
 # OpenRecon API
 
+Web UI: [openrecon-ui](https://github.com/TsioryJonathan/openrecon-ui) (live: <https://openrecon-ui.vercel.app>)
+
 OSINT reconnaissance API. Modular, correlated, evidence-backed recon engine.
 
 - **Sherlock** : username presence on 480 platforms (rust `sherlock-rs`; live count on `GET /api/sherlock/sites`)
