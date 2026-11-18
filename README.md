@@ -87,6 +87,22 @@ uv run mypy app tests  # type checking
 
 CI runs all three on every push/PR to `dev` and `main`.
 
+
+## Bounded investigation scans
+
+`POST /api/investigations/{id}/adaptive-scan` defaults to one follow-up step
+(`max_depth=1`) and 25 target scan attempts (`max_targets=25`, including the
+starting target). Depth can be set from 0 to 4; the target budget from 1 to 100.
+Nameserver-derived domains are recorded in `leads_skipped` for manual review
+rather than automatically scanning shared DNS providers. Subdomain leads still
+follow the normal depth, scope and budget checks.
+
+Results include the configured limits, per-target provenance (`source_lead`),
+extracted leads, skipped reasons and partial errors. `targets_scanned` excludes
+unsupported, out-of-scope and budget-skipped targets. These limits bound each
+run; they do not establish that connected targets belong to the same person or
+organization.
+
 ## License
 
 [MIT](LICENSE) © Tsiory Jonathan

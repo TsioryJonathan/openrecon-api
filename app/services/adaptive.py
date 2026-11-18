@@ -24,6 +24,7 @@ Output:
 """
 
 import logging
+from collections import deque
 from dataclasses import dataclass, field
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,7 +38,8 @@ from app.services.scan import SUPPORTED_TARGET_TYPES, ScanResult, run_scan
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MAX_DEPTH = 2  # hops beyond the initial scan
+DEFAULT_MAX_TARGETS = 25
+DEFAULT_MAX_DEPTH = 1  # hops beyond the initial scan
 
 
 @dataclass
@@ -95,6 +97,7 @@ async def run_adaptive_scan(
     scope: Scope | None = None,
     rate_limiter: RateLimiter | None = None,
     max_depth: int = DEFAULT_MAX_DEPTH,
+    max_targets: int = DEFAULT_MAX_TARGETS,
     investigation_id: str | None = None,
     owner_id: str | None = None,
 ) -> AdaptiveResult:
@@ -119,11 +122,17 @@ async def run_adaptive_scan(
         options: options passed to ALL modules at ALL depths.
         scope: scope enforcement (default: UNRESTRICTED).
         rate_limiter: rate limiter instance (default: singleton).
-        max_depth: maximum number of hops beyond the initial scan (default 2).
+        max_depth: maximum number of hops beyond the initial scan (default 1).
+        max_targets: maximum number of scan attempts, including the initial target (1–100).
         investigation_id: if set, each scanned target is linked to this
             investigation via add_target_to_investigation (idempotent).
         owner_id: ownership scope passed through to investigation services.
     """
+    if not 0 <= max_depth <= 4:
+        raise ValueError("max_depth must be between 0 and 4.")
+    if not 1 <= max_targets <= 100:
+        raise ValueError("max_targets must be between 1 and 100.")
+
     scope = scope or UNRESTRICTED
     rate_limiter = rate_limiter or get_rate_limiter()
     options = options or {}
@@ -134,10 +143,10 @@ async def run_adaptive_scan(
     session_seen: set[tuple] = set()
 
     # Queue of (depth, target_type, target_value, source_lead).
-    queue: list[tuple[int, str, str, Lead | None]] = [(0, target_type, target_value, None)]
+    queue: deque[tuple[int, str, str, Lead | None]] = deque([(0, target_type, target_value, None)])
 
     while queue:
-        depth, ttype, tvalue, source_lead = queue.pop(0)
+        depth, ttype, tvalue, source_lead = queue.popleft()
 
         # Session dedup guard.
         key = (ttype, tvalue)
@@ -152,7 +161,6 @@ async def run_adaptive_scan(
             )
             continue
         session_seen.add(key)
-        result.targets_scanned.add(key)
 
         # Depth guard.
         if depth > max_depth:
@@ -162,6 +170,20 @@ async def run_adaptive_scan(
                     "target_value": tvalue,
                     "reason": f"Depth limit reached ({max_depth}).",
                     "depth": depth,
+                }
+            )
+            continue
+
+        # Shared DNS infrastructure does not establish ownership. Keep the lead
+        # visible for review instead of automatically expanding into its operator.
+        if source_lead and source_lead.source_finding_type == "nameserver":
+            result.leads_skipped.append(
+                {
+                    "target_type": ttype,
+                    "target_value": tvalue,
+                    "reason": "Shared nameserver infrastructure requires manual review.",
+                    "depth": depth,
+                    "rule": source_lead.rule,
                 }
             )
             continue
@@ -197,6 +219,19 @@ async def run_adaptive_scan(
             )
             continue
 
+        if len(result.targets_scanned) >= max_targets:
+            result.leads_skipped.append(
+                {
+                    "target_type": ttype,
+                    "target_value": tvalue,
+                    "reason": f"Target budget reached ({max_targets}).",
+                    "depth": depth,
+                }
+            )
+            continue
+
+        # Only count targets that pass all guards and reach the scan pipeline.
+        result.targets_scanned.add(key)
         # Run the scan.
         logger.info(
             "run_adaptive_scan: scanning %s:%s depth=%d/%d",

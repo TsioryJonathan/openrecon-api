@@ -20,7 +20,7 @@ from app.schemas import (
     InvestigationTargetFindingsResponse,
 )
 from app.services import investigation as inv_service
-from app.services.adaptive import DEFAULT_MAX_DEPTH, run_adaptive_scan
+from app.services.adaptive import DEFAULT_MAX_DEPTH, DEFAULT_MAX_TARGETS, run_adaptive_scan
 from app.services.correlation import (
     build_relation_items,
     get_relations_for_investigation,
@@ -292,8 +292,14 @@ async def adaptive_scan_within_investigation(
         description=(
             "Maximum number of hops beyond the initial scan. "
             "0 = scan only the initial target (same as /scan). "
-            "Default: 2. Maximum: 4."
+            "Default: 1. Maximum: 4."
         ),
+    ),
+    max_targets: int = Query(
+        default=DEFAULT_MAX_TARGETS,
+        ge=1,
+        le=100,
+        description="Maximum targets to scan, including the initial target. Default: 25.",
     ),
     db: AsyncSession = Depends(get_db),
     owner_id: str | None = Depends(get_current_user_id),
@@ -308,10 +314,12 @@ async def adaptive_scan_within_investigation(
     Safety guarantees enforced by the engine:
     - **Depth limit**: never exceeds `max_depth` hops.
     - **Session dedup**: each (type, value) pair scanned at most once per run.
-    - **Scope**: only targets within the investigation's scope are scanned.
+    - **Target budget**: at most `max_targets` scan attempts per run.
+    - **Scope**: unrestricted unless explicitly configured by the caller.
     - **Rate limit**: the process-wide rate limiter applies per (target, module).
 
-    All discovered targets are automatically linked to the investigation.
+    Nameserver leads are recorded for manual review rather than automatically scanned.
+    All scanned targets are automatically linked to the investigation.
     Returns a summary of all hops, findings, leads extracted/skipped.
     """
     if body.target_type not in SUPPORTED_TARGET_TYPES:
@@ -341,6 +349,7 @@ async def adaptive_scan_within_investigation(
         target_value=body.target_value.strip(),
         options=body.options,
         max_depth=max_depth,
+        max_targets=max_targets,
         investigation_id=investigation_id,
         owner_id=owner_id,
     )
@@ -379,6 +388,7 @@ async def adaptive_scan_within_investigation(
     return {
         "investigation_id": investigation_id,
         "max_depth": max_depth,
+        "max_targets": max_targets,
         "hop_count": adaptive_result.hop_count,
         "targets_scanned": [
             {"type": t, "value": v} for t, v in sorted(adaptive_result.targets_scanned)

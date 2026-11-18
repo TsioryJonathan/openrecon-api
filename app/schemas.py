@@ -300,6 +300,9 @@ class AdaptiveTargetItem(BaseModel):
 class AdaptiveScanResponse(BaseModel):
     investigation_id: str
     max_depth: int = Field(..., description="Maximum hops configured for this run.")
+    max_targets: int = Field(
+        ..., description="Maximum scan attempts, including the initial target."
+    )
     hop_count: int = Field(..., description="Total number of hops executed.")
     targets_scanned: list[AdaptiveTargetItem] = Field(
         ..., description="All (type, value) pairs scanned in this run."
@@ -309,7 +312,7 @@ class AdaptiveScanResponse(BaseModel):
     hops: list[AdaptiveHopItem] = Field(..., description="Per-hop results, depth 0 first.")
     leads_skipped: list[dict] = Field(
         default_factory=list,
-        description="Leads not scanned (out of scope, deduped, unsupported type, depth exceeded).",
+        description="Leads not scanned (out of scope, deduped, unsupported type, depth exceeded, target budget reached).",
     )
     errors: list[str] = Field(default_factory=list)
     investigation: InvestigationSummaryResponse

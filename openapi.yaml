@@ -486,12 +486,16 @@ paths:
 
         - **Session dedup**: each (type, value) pair scanned at most once per run.
 
-        - **Scope**: only targets within the investigation''s scope are scanned.
+        - **Target budget**: at most `max_targets` scan attempts per run.
+
+        - **Scope**: unrestricted unless explicitly configured by the caller.
 
         - **Rate limit**: the process-wide rate limiter applies per (target, module).
 
 
-        All discovered targets are automatically linked to the investigation.
+        Nameserver leads are recorded for manual review rather than automatically scanned.
+
+        All scanned targets are automatically linked to the investigation.
 
         Returns a summary of all hops, findings, leads extracted/skipped.'
       operationId: adaptive_scan_within_investigation_api_investigations__investigation_id__adaptive_scan_post
@@ -510,11 +514,22 @@ paths:
           maximum: 4
           minimum: 0
           description: 'Maximum number of hops beyond the initial scan. 0 = scan only
-            the initial target (same as /scan). Default: 2. Maximum: 4.'
-          default: 2
+            the initial target (same as /scan). Default: 1. Maximum: 4.'
+          default: 1
           title: Max Depth
         description: 'Maximum number of hops beyond the initial scan. 0 = scan only
-          the initial target (same as /scan). Default: 2. Maximum: 4.'
+          the initial target (same as /scan). Default: 1. Maximum: 4.'
+      - name: max_targets
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 25
+          title: Max Targets
+          description: 'Maximum targets to scan, including the initial target. Default: 25.'
+        description: 'Maximum targets to scan, including the initial target. Default: 25.'
       requestBody:
         required: true
         content:
@@ -784,6 +799,10 @@ components:
           type: integer
           title: Max Depth
           description: Maximum hops configured for this run.
+        max_targets:
+          type: integer
+          title: Max Targets
+          description: Maximum scan attempts, including the initial target.
         hop_count:
           type: integer
           title: Hop Count
@@ -813,7 +832,7 @@ components:
           type: array
           title: Leads Skipped
           description: Leads not scanned (out of scope, deduped, unsupported type,
-            depth exceeded).
+            depth exceeded, target budget reached).
         errors:
           items:
             type: string
@@ -825,6 +844,7 @@ components:
       required:
       - investigation_id
       - max_depth
+      - max_targets
       - hop_count
       - targets_scanned
       - total_finding_count
