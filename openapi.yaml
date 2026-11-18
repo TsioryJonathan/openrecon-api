@@ -493,7 +493,8 @@ paths:
         - **Rate limit**: the process-wide rate limiter applies per (target, module).
 
 
-        Nameserver leads are recorded for manual review rather than automatically scanned.
+        Nameserver leads are recorded for manual review rather than automatically
+        scanned.
 
         All scanned targets are automatically linked to the investigation.
 
@@ -526,10 +527,12 @@ paths:
           type: integer
           maximum: 100
           minimum: 1
+          description: 'Maximum targets to scan, including the initial target. Default:
+            25.'
           default: 25
           title: Max Targets
-          description: 'Maximum targets to scan, including the initial target. Default: 25.'
-        description: 'Maximum targets to scan, including the initial target. Default: 25.'
+        description: 'Maximum targets to scan, including the initial target. Default:
+          25.'
       requestBody:
         required: true
         content:
